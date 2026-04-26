@@ -1,0 +1,201 @@
+# 🌿 CARTE INSTALLATION v2.2
+# Carte autonome à placer où vous voulez dans votre dashboard.
+# Nécessite : tonte_setup.yaml chargé dans HA.
+
+type: vertical-stack
+cards:
+
+  # ━━━ BOUTON REPLIABLE ━━━
+  - type: custom:mushroom-template-card
+    primary: "⚙️ Installation & Configuration"
+    secondary: >
+      {% set s = states('input_text.tonte_cfg_statut') %}
+      {{ s if s not in ['unknown','unavailable',''] else 'Non configuré' }}
+    icon: >
+      {% if is_state('input_boolean.tonte_afficher_installation', 'on') %}
+        mdi:chevron-up
+      {% else %}
+        mdi:wrench-cog
+      {% endif %}
+    icon_color: >
+      {% set s = states('input_text.tonte_cfg_statut') %}
+      {% if '✅' in s %}green{% elif '⏳' in s %}amber{% else %}grey{% endif %}
+    multiline_secondary: false
+    tap_action:
+      action: perform-action
+      perform_action: input_boolean.toggle
+      target:
+        entity_id: input_boolean.tonte_afficher_installation
+    card_mod:
+      style: |
+        ha-card { text-align: center; --card-primary-font-size: 14px; }
+
+  # ━━━ CONTENU REPLIABLE ━━━
+  - type: conditional
+    conditions:
+      - entity: input_boolean.tonte_afficher_installation
+        state: "on"
+    card:
+      type: vertical-stack
+      cards:
+
+        # ── Titre ─────────────────────────────────────────────
+        - type: custom:mushroom-title-card
+          title: "🌿 Assistant Intelligent de Tonte"
+          subtitle: "v2.2 — Navimow + Home Assistant"
+          card_mod:
+            style: |
+              ha-card { text-align: center; }
+
+        # ── Explication ───────────────────────────────────────
+        - type: custom:mushroom-template-card
+          primary: "Comment ça marche ?"
+          secondary: >
+            Remplissez les champs ci-dessous avec vos informations,
+            puis appuyez sur "Appliquer la configuration".
+            Le fichier tonte_intelligente.yaml sera automatiquement
+            personnalisé et HA redémarrera.
+            Une sauvegarde horodatée est créée avant chaque application.
+          icon: mdi:information-outline
+          icon_color: cyan
+          multiline_secondary: true
+          tap_action:
+            action: none
+          card_mod:
+            style: |
+              ha-card { opacity: 0.85; }
+
+        # ── Séparateur ────────────────────────────────────────
+        - type: custom:mushroom-title-card
+          title: ""
+          subtitle: "▸ Paramètres de votre installation"
+          card_mod:
+            style: |
+              ha-card { --subtitle-font-size: 12px; opacity: 0.6; }
+
+        # ── Modèle tondeuse ───────────────────────────────────
+        - type: custom:mushroom-entity-card
+          entity: input_text.tonte_cfg_modele
+          name: "Modèle tondeuse"
+          secondary_info: "ex : navimow_i105e  /  navimow_h3000"
+          icon: mdi:robot-mower-outline
+          icon_color: green
+
+        # ── Ville météo ───────────────────────────────────────
+        - type: custom:mushroom-entity-card
+          entity: input_text.tonte_cfg_ville_meteo
+          name: "Ville Météo France"
+          secondary_info: "ex : rennes  /  paris  /  lyon"
+          icon: mdi:weather-partly-cloudy
+          icon_color: cyan
+
+        # ── Entité Telegram ───────────────────────────────────
+        - type: custom:mushroom-entity-card
+          entity: input_text.tonte_cfg_telegram_event
+          name: "Entité Telegram (sans event.)"
+          secondary_info: "Outils de dev → États → chercher event."
+          icon: mdi:send
+          icon_color: deep-purple
+
+        # ── Appareil mobile ───────────────────────────────────
+        - type: custom:mushroom-entity-card
+          entity: input_text.tonte_cfg_mobile
+          name: "Appareil mobile (notify)"
+          secondary_info: "ex : mobile_app_pixel_9a  (si mode mobile)"
+          icon: mdi:cellphone
+          icon_color: orange
+
+        # ── Mode notification ─────────────────────────────────
+        - type: custom:mushroom-select-card
+          entity: input_select.tonte_cfg_notification
+          name: "Mode de notification"
+          icon: mdi:bell-outline
+          icon_color: deep-purple
+
+        # ── Zone isolée ───────────────────────────────────────
+        - type: horizontal-stack
+          cards:
+            - type: custom:mushroom-entity-card
+              entity: input_boolean.tonte_cfg_zone_active
+              name: "Zone isolée activée"
+              icon: mdi:floor-plan
+              icon_color: deep-purple
+            - type: custom:mushroom-entity-card
+              entity: input_text.tonte_zone_isolee_nom
+              name: "Nom de la zone"
+              icon: mdi:tag
+              icon_color: deep-purple
+
+        # ── Calendrier ────────────────────────────────────────
+        - type: custom:mushroom-entity-card
+          entity: input_boolean.tonte_cfg_calendrier
+          name: "Historique calendrier activé"
+          icon: mdi:calendar-check
+          icon_color: teal
+
+        # ── Séparateur ────────────────────────────────────────
+        - type: custom:mushroom-title-card
+          title: ""
+          subtitle: "▸ Appliquer"
+          card_mod:
+            style: |
+              ha-card { --subtitle-font-size: 12px; opacity: 0.6; }
+
+        # ── Statut ────────────────────────────────────────────
+        - type: custom:mushroom-template-card
+          primary: "Statut"
+          secondary: >
+            {% set s = states('input_text.tonte_cfg_statut') %}
+            {{ s if s not in ['unknown','unavailable',''] else 'Non configuré' }}
+          icon: >
+            {% set s = states('input_text.tonte_cfg_statut') %}
+            {% if '✅' in s %}mdi:check-circle{% elif '⏳' in s %}mdi:timer-sand{% else %}mdi:alert-circle-outline{% endif %}
+          icon_color: >
+            {% set s = states('input_text.tonte_cfg_statut') %}
+            {% if '✅' in s %}green{% elif '⏳' in s %}amber{% else %}grey{% endif %}
+          multiline_secondary: false
+          tap_action:
+            action: none
+
+        # ── Bouton Appliquer ──────────────────────────────────
+        - type: custom:mushroom-template-card
+          primary: "🚀 Appliquer la configuration"
+          secondary: >
+            Une sauvegarde horodatée sera créée,
+            puis HA redémarrera automatiquement.
+          icon: mdi:content-save-cog
+          icon_color: green
+          multiline_secondary: true
+          tap_action:
+            action: perform-action
+            perform_action: script.tonte_appliquer_config
+            confirmation:
+              text: >
+                Appliquer la configuration et redémarrer HA ?
+                Une sauvegarde sera créée dans /config/packages/.
+          card_mod:
+            style: |
+              ha-card {
+                text-align: center;
+                border: 2px solid rgba(76, 175, 80, 0.4);
+                border-radius: 12px;
+              }
+
+        # ── Avertissement ─────────────────────────────────────
+        - type: custom:mushroom-template-card
+          primary: "⚠️ Avant d'appliquer"
+          secondary: >
+            • Le fichier tonte_intelligente.yaml doit contenir
+            les placeholders d'origine (navimow_VOTRE_MODELE, etc.).
+            Si vous ré-appliquez après une MAJ, remplacez d'abord
+            le fichier par la nouvelle version vierge.
+            • Telegram : bot en mode POLLING obligatoire.
+            • Les sauvegardes sont dans /config/packages/.
+          icon: mdi:alert-outline
+          icon_color: orange
+          multiline_secondary: true
+          tap_action:
+            action: none
+          card_mod:
+            style: |
+              ha-card { opacity: 0.8; }

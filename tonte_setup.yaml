@@ -1,0 +1,323 @@
+# ╔══════════════════════════════════════════════════════════════╗
+# ║      🌿 ASSISTANT INTELLIGENT DE TONTE v2.3 🌿             ║
+# ║            Package d'installation — tonte_setup.yaml        ║
+# ╚══════════════════════════════════════════════════════════════╝
+#
+#  Ce fichier gère la configuration personnalisée de l'assistant.
+#  Il est SÉPARÉ du fichier principal tonte_intelligente.yaml.
+#  → Lors d'une mise à jour, remplacez uniquement tonte_intelligente.yaml.
+#  → Ce fichier et vos paramètres sont préservés.
+#
+#  Installation :
+#    homeassistant:
+#      packages:
+#        tonte_setup: !include packages/tonte_setup.yaml
+#        tonte:       !include packages/tonte_intelligente.yaml
+
+
+# ============================================================
+#  INPUTS DE CONFIGURATION
+# ============================================================
+
+input_text:
+
+  # ── Entités tondeuse ──────────────────────────────────────
+  tonte_cfg_modele:
+    name: "⚙️ Modèle tondeuse"
+    icon: mdi:robot-mower-outline
+    initial: "navimow_VOTRE_MODELE"
+    max: 60
+
+  # ── Météo ─────────────────────────────────────────────────
+  tonte_cfg_ville_meteo:
+    name: "⚙️ Ville Météo France"
+    icon: mdi:weather-partly-cloudy
+    initial: "breteuil"
+    max: 60
+
+  # ── Telegram ──────────────────────────────────────────────
+  tonte_cfg_telegram_event:
+    name: "⚙️ Entité événement Telegram"
+    icon: mdi:send
+    initial: "ha_maison_update_event"
+    max: 80
+
+  # ── Mobile ────────────────────────────────────────────────
+  tonte_cfg_mobile:
+    name: "⚙️ Appareil mobile (notify)"
+    icon: mdi:cellphone
+    initial: "mobile_app_pixel_9a"
+    max: 60
+
+  # ── Nom de la zone isolée ────────────────────────────────
+  tonte_zone_isolee_nom:
+    name: "Nom de la zone isolée"
+    icon: mdi:tag
+    initial: "Terrasse"
+    max: 30
+
+  # ── Statut de la dernière application ─────────────────────
+  tonte_cfg_statut:
+    name: "⚙️ Statut installation"
+    icon: mdi:information-outline
+    initial: "Non configuré"
+    max: 100
+
+input_boolean:
+
+  # ── Zone isolée ───────────────────────────────────────────
+  tonte_cfg_zone_active:
+    name: "⚙️ Zone isolée activée"
+    icon: mdi:floor-plan
+    initial: true
+
+  # ── Calendrier ────────────────────────────────────────────
+  tonte_cfg_calendrier:
+    name: "⚙️ Calendrier activé"
+    icon: mdi:calendar-check
+    initial: true
+
+  # ── Afficher la carte d'installation ──────────────────────
+  tonte_afficher_installation:
+    name: "Afficher installation"
+    icon: mdi:wrench
+    initial: false
+
+input_select:
+  tonte_mode_notification:
+    name: "Mode de notification"
+    icon: mdi:bell-outline
+    options:
+      - telegram
+      - mobile
+      - aucune
+    initial: telegram
+
+
+# ============================================================
+#  SHELL COMMANDS
+# ============================================================
+
+shell_command:
+
+  # Sauvegarde horodatée avant toute modification
+  tonte_backup:
+    "cp /config/packages/tonte_intelligente.yaml \
+    /config/packages/tonte_intelligente.yaml.bak_$(date +%Y%m%d_%H%M)"
+
+  # Remplacements dans tonte_intelligente.yaml
+  tonte_sed_modele: >
+    sed -i 's/navimow_VOTRE_MODELE/{{ states('input_text.tonte_cfg_modele') | trim }}/g'
+    /config/packages/tonte_intelligente.yaml
+
+  tonte_sed_meteo: >
+    sed -i 's/breteuil/{{ states('input_text.tonte_cfg_ville_meteo') | trim | lower }}/g'
+    /config/packages/tonte_intelligente.yaml
+
+  tonte_sed_telegram: >
+    sed -i 's/ha_maison_update_event/{{ states('input_text.tonte_cfg_telegram_event') | trim }}/g'
+    /config/packages/tonte_intelligente.yaml
+
+  tonte_sed_mobile: >
+    sed -i 's/mobile_app_pixel_9a/{{ states('input_text.tonte_cfg_mobile') | trim }}/g'
+    /config/packages/tonte_intelligente.yaml
+
+  tonte_sed_zone_on: >
+    sed -i '/tonte_zone_isolee_active/{n;s/initial: false/initial: true/}'
+    /config/packages/tonte_intelligente.yaml
+
+  tonte_sed_zone_off: >
+    sed -i '/tonte_zone_isolee_active/{n;n;n;n;s/initial: true/initial: false/}'
+    /config/packages/tonte_intelligente.yaml
+
+  tonte_sed_calendrier_on: >
+    sed -i '/tonte_calendrier_actif/{n;n;n;n;s/initial: false/initial: true/}'
+    /config/packages/tonte_intelligente.yaml
+
+  tonte_sed_calendrier_off: >
+    sed -i '/tonte_calendrier_actif/{n;n;n;n;s/initial: true/initial: false/}'
+    /config/packages/tonte_intelligente.yaml
+
+  # Remplacements dans les cartes
+  tonte_sed_carte_dashboard_modele: >
+    sed -i 's/navimow_VOTRE_MODELE/{{ states('input_text.tonte_cfg_modele') | trim }}/g'
+    /config/packages/carte_tonte_dashboard.yaml
+
+  tonte_sed_carte_mini_modele: >
+    sed -i 's/navimow_VOTRE_MODELE/{{ states('input_text.tonte_cfg_modele') | trim }}/g'
+    /config/packages/carte_tonte_mini.yaml
+
+  # Persistance des valeurs dans tonte_setup.yaml (survivent au redémarrage)
+  tonte_persist_modele: >
+    sed -i 's|initial: "navimow_VOTRE_MODELE"|initial: "{{ states('input_text.tonte_cfg_modele') | trim }}"|g'
+    /config/packages/tonte_setup.yaml
+
+  tonte_persist_meteo: >
+    sed -i '/tonte_cfg_ville_meteo/{n;n;n;s|initial: ".*"|initial: "{{ states('input_text.tonte_cfg_ville_meteo') | trim | lower }}"|}'
+    /config/packages/tonte_setup.yaml
+
+  tonte_persist_telegram: >
+    sed -i '/tonte_cfg_telegram_event/{n;n;n;s|initial: ".*"|initial: "{{ states('input_text.tonte_cfg_telegram_event') | trim }}"|}'
+    /config/packages/tonte_setup.yaml
+
+  tonte_persist_mobile: >
+    sed -i '/tonte_cfg_mobile/{n;n;n;s|initial: ".*"|initial: "{{ states('input_text.tonte_cfg_mobile') | trim }}"|}'
+    /config/packages/tonte_setup.yaml
+
+  tonte_persist_statut: >
+    sed -i '/tonte_cfg_statut/{n;n;n;s|initial: ".*"|initial: "{{ states('input_text.tonte_cfg_statut') | trim }}"|}'
+    /config/packages/tonte_setup.yaml
+
+  tonte_persist_zone_on: >
+    sed -i '/tonte_cfg_zone_active/{n;n;n;s|initial: .*|initial: true|}'
+    /config/packages/tonte_setup.yaml
+
+  tonte_persist_zone_off: >
+    sed -i '/tonte_cfg_zone_active/{n;n;n;s|initial: .*|initial: false|}'
+    /config/packages/tonte_setup.yaml
+
+  tonte_persist_zone_nom: >
+    sed -i '/tonte_zone_isolee_nom/{n;n;n;s|initial: ".*"|initial: "{{ states('input_text.tonte_zone_isolee_nom') | trim }}"|}'
+    /config/packages/tonte_setup.yaml
+
+  tonte_persist_calendrier_on: >
+    sed -i '/tonte_cfg_calendrier/{n;n;n;s|initial: .*|initial: true|}'
+    /config/packages/tonte_setup.yaml
+
+  tonte_persist_calendrier_off: >
+    sed -i '/tonte_cfg_calendrier/{n;n;n;s|initial: .*|initial: false|}'
+    /config/packages/tonte_setup.yaml
+
+
+# ============================================================
+#  SCRIPT D'INSTALLATION
+# ============================================================
+
+script:
+  tonte_appliquer_config:
+    alias: "🌿 Appliquer la configuration"
+    icon: mdi:content-save-cog
+    sequence:
+
+      # 1. Statut : en cours
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.tonte_cfg_statut
+        data:
+          value: "⏳ Application en cours..."
+
+      # 2. Sauvegarde horodatée
+      - service: shell_command.tonte_backup
+      - delay:
+          seconds: 1
+
+      # 3. Remplacement modèle tondeuse
+      - service: shell_command.tonte_sed_modele
+      - delay:
+          seconds: 1
+
+      # 4. Remplacement ville météo
+      - service: shell_command.tonte_sed_meteo
+      - delay:
+          seconds: 1
+
+      # 5. Remplacement entité Telegram
+      - service: shell_command.tonte_sed_telegram
+      - delay:
+          seconds: 1
+
+      # 6. Remplacement appareil mobile
+      - service: shell_command.tonte_sed_mobile
+      - delay:
+          seconds: 1
+
+      # 7. Mode notification — select_option direct (pas de sed, pas de conflit BDD)
+      - service: input_select.select_option
+        target:
+          entity_id: input_select.tonte_mode_notification
+        data:
+          option: "{{ states('input_select.tonte_mode_notification') }}"
+      - delay:
+          seconds: 1
+
+      # 8. Zone isolée
+      - choose:
+          - conditions:
+              - condition: state
+                entity_id: input_boolean.tonte_cfg_zone_active
+                state: "on"
+            sequence:
+              - service: shell_command.tonte_sed_zone_on
+          - conditions:
+              - condition: state
+                entity_id: input_boolean.tonte_cfg_zone_active
+                state: "off"
+            sequence:
+              - service: shell_command.tonte_sed_zone_off
+      - delay:
+          seconds: 1
+
+      # 9. Calendrier
+      - choose:
+          - conditions:
+              - condition: state
+                entity_id: input_boolean.tonte_cfg_calendrier
+                state: "on"
+            sequence:
+              - service: shell_command.tonte_sed_calendrier_on
+          - conditions:
+              - condition: state
+                entity_id: input_boolean.tonte_cfg_calendrier
+                state: "off"
+            sequence:
+              - service: shell_command.tonte_sed_calendrier_off
+      - delay:
+          seconds: 1
+
+      # 10. Remplacements dans les cartes
+      - service: shell_command.tonte_sed_carte_dashboard_modele
+      - service: shell_command.tonte_sed_carte_mini_modele
+      - delay:
+          seconds: 1
+
+      # 11. Statut : succès
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.tonte_cfg_statut
+        data:
+          value: >
+            ✅ Configuré le {{ now().strftime('%d/%m/%Y à %H:%M') }}
+
+      # 12. Persistance des valeurs dans tonte_setup.yaml
+      #     (les initial: sont mis à jour → survivent au redémarrage)
+      - service: shell_command.tonte_persist_modele
+      - service: shell_command.tonte_persist_meteo
+      - service: shell_command.tonte_persist_telegram
+      - service: shell_command.tonte_persist_mobile
+      - service: shell_command.tonte_persist_statut
+      - choose:
+          - conditions:
+              - condition: state
+                entity_id: input_boolean.tonte_cfg_zone_active
+                state: "on"
+            sequence:
+              - service: shell_command.tonte_persist_zone_on
+        default:
+          - service: shell_command.tonte_persist_zone_off
+      - service: shell_command.tonte_persist_zone_nom
+      - choose:
+          - conditions:
+              - condition: state
+                entity_id: input_boolean.tonte_cfg_calendrier
+                state: "on"
+            sequence:
+              - service: shell_command.tonte_persist_calendrier_on
+        default:
+          - service: shell_command.tonte_persist_calendrier_off
+      - delay:
+          seconds: 2
+
+      # 13. Redémarrage HA
+      - delay:
+          seconds: 2
+      - service: homeassistant.restart

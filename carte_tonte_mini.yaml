@@ -1,0 +1,45 @@
+# 🌿 CARTE MINI v7
+
+type: custom:mushroom-template-card
+primary: Tondeuse Navimow
+secondary: >
+  {% set d = states('sensor.tonte_decision_du_jour') %}
+  {% set bat = states('sensor.navimow_VOTRE_MODELE_batterie') | int(0) %}
+  {% set terrasse = is_state('input_boolean.tonte_mode_zone_isolee', 'on') %}
+  {% set auto = is_state('input_boolean.tonte_mode_auto', 'on') %}
+  {% if d == 'en_cours' and terrasse %}
+    🔄 Tonte {{ states('input_text.tonte_zone_isolee_nom') | lower }} · 🔋 {{ bat }}%
+  {% elif d == 'en_cours' %}
+    🔄 Tonte en cours · 🔋 {{ bat }}%
+  {% elif d == 'effectuee' %}
+    ✅ Tondu · Prochaine : {{ state_attr('sensor.tonte_decision_du_jour', 'prochaine_tonte_estimee') | default('—') }}
+  {% elif d == 'tondre' %}
+    🌿 Jour de tonte · 🔋 {{ bat }}%
+  {% elif d == 'reporte_pluie' %}
+    🌧️ Reporté pluie{% elif d == 'reporte_manuel' %}
+    ⏭️ Reporté{% set dm = state_attr('sensor.tonte_meteo_favorable', 'meteo_demain') | default('inconnu') %}{% if dm == 'favorable' %} · Demain OK{% elif dm == 'défavorable' %} · Pluie aussi demain{% endif %}
+  {% elif d == 'hivernage' %}
+    ❄️ Hivernage · Reprise en mars
+  {% else %}
+    {% if auto %}🤖 Auto · {% endif %}Prochaine : {{ state_attr('sensor.tonte_decision_du_jour', 'prochaine_tonte_estimee') | default('—') }}
+  {% endif %}
+  {% if auto and d not in ['en_cours','hivernage'] %}🤖 Mode autonome activé · {% endif %}{{ state_attr('sensor.tonte_profil_saisonnier', 'description_mois') }}
+icon: mdi:robot-mower-outline
+icon_color: >
+  {% set d = states('sensor.tonte_decision_du_jour') %}
+  {% set auto = is_state('input_boolean.tonte_mode_auto', 'on') %}
+  {% if d == 'en_cours' %}amber{% elif d == 'effectuee' %}teal{% elif d == 'tondre' %}green{% elif d == 'reporte_pluie' %}orange{% elif d == 'reporte_manuel' %}orange{% elif d == 'hivernage' %}blue{% elif auto %}green{% else %}disabled{% endif %}
+multiline_secondary: true
+tap_action:
+  action: navigate
+  navigation_path: /lovelace/tondeuse-robot
+card_mod:
+  style: |
+    mushroom-shape-icon {
+      --icon-size: 46px;
+      --shape-color: {% set d = states('sensor.tonte_decision_du_jour') %}{% if d == 'en_cours' %}rgba(255, 167, 38, 0.2){% elif d == 'effectuee' %}rgba(29, 158, 117, 0.2){% elif d == 'tondre' %}rgba(76, 175, 80, 0.2){% elif d == 'reporte_pluie' %}rgba(255, 152, 0, 0.2){% elif d == 'hivernage' %}rgba(55, 138, 221, 0.2){% else %}rgba(158, 158, 158, 0.1){% endif %} !important;
+    }
+    ha-card {
+      border-left: 3px solid {% set d = states('sensor.tonte_decision_du_jour') %}{% set auto = is_state('input_boolean.tonte_mode_auto', 'on') %}{% if d == 'en_cours' %}rgba(255, 167, 38, 0.6){% elif d == 'effectuee' %}rgba(29, 158, 117, 0.6){% elif d == 'tondre' %}rgba(76, 175, 80, 0.6){% elif d == 'reporte_pluie' %}rgba(255, 152, 0, 0.6){% elif d == 'hivernage' %}rgba(55, 138, 221, 0.6){% elif auto %}rgba(76, 175, 80, 0.4){% else %}transparent{% endif %};
+      border-radius: 12px;
+    }

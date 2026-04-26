@@ -1,0 +1,1977 @@
+# ╔══════════════════════════════════════════════════════════════╗
+# ║        🌿 ASSISTANT INTELLIGENT DE TONTE v2.3 🌿           ║
+# ║       Package Home Assistant - Navimow + NavimowHA          ║
+# ╚══════════════════════════════════════════════════════════════╝
+#
+#  ┌──────────────────────────────────────────────────────────┐
+#  │         ⚙️  CONFIGURATION — DEUX MÉTHODES               │
+#  │                                                          │
+#  │  MÉTHODE 1 (recommandée) : Carte d'installation          │
+#  │  Chargez tonte_setup.yaml, ajoutez la carte              │
+#  │  carte_tonte_installation.yaml dans votre dashboard,     │
+#  │  remplissez le formulaire et cliquez "Appliquer".        │
+#  │  Vos paramètres sont sauvegardés dans tonte_setup.yaml   │
+#  │  et survivent aux mises à jour du fichier principal.     │
+#  │                                                          │
+#  │  MÉTHODE 2 (manuelle) : Chercher/Remplacer               │
+#  │  1. navimow_VOTRE_MODELE  →  votre modèle               │
+#  │     (ex: navimow_i105e, navimow_h3000, navimow_x3...)   │
+#  │  2. breteuil  →  votre ville Météo France                │
+#  │  3. ha_maison_update_event  →  votre entité Telegram     │
+#  │     Si mobile : remplacer aussi mobile_app_pixel_9a      │
+#  │  4. NOTIFICATIONS : modifier "initial:" ci-dessous       │
+#  │  5. ZONE ISOLÉE : déclarée dans tonte_setup.yaml         │
+#  │  6. CALENDRIER : voir section ci-dessous                 │
+#  │  7. SAISONS : configurable depuis le dashboard           │
+#  │  8. TIMERS AVANCÉS : voir section ci-dessous             │
+#  └──────────────────────────────────────────────────────────┘
+
+
+# ============================================================
+#  1. INPUT HELPERS
+# ============================================================
+
+# tonte_mode_notification est déclaré dans tonte_setup.yaml
+
+# ┌──────────────────────────────────────────────────────────┐
+# │         🏠 ZONE ISOLÉE (terrasse, potager, etc.)         │
+# │                                                          │
+# │  Pour DÉSACTIVER : mettre initial: false ci-dessous      │
+# │  Pour RENOMMER  : changer "Terrasse" ci-dessous          │
+# └──────────────────────────────────────────────────────────┘
+
+# tonte_zone_isolee_nom est déclaré dans tonte_setup.yaml
+
+input_datetime:
+  tonte_derniere_date:
+    name: "Dernière tonte effectuée"
+    has_date: true
+    has_time: false
+    icon: mdi:calendar-check
+  tonte_heure_notification:
+    name: "Heure de notification"
+    has_date: false
+    has_time: true
+    icon: mdi:clock-outline
+    initial: "08:00"
+
+  # Plage horaire autorisée pour le démarrage automatique
+  tonte_auto_heure_debut:
+    name: "Mode auto - Heure de début"
+    has_date: false
+    has_time: true
+    icon: mdi:clock-start
+    initial: "09:00"
+
+  tonte_auto_heure_fin:
+    name: "Mode auto - Heure de fin"
+    has_date: false
+    has_time: true
+    icon: mdi:clock-end
+    initial: "18:00"
+
+input_boolean:
+  tonte_hivernage_force:
+    name: "Hivernage forcé"
+    icon: mdi:snowflake
+  tonte_mode_vacances:
+    name: "Mode vacances"
+    icon: mdi:palm-tree
+  tonte_afficher_reglages:
+    name: "Afficher les réglages"
+    icon: mdi:cog
+    initial: false
+  tonte_afficher_config_saison:
+    name: "Afficher config saisonnière"
+    icon: mdi:calendar-month
+    initial: false
+  tonte_session_active:
+    name: "Session de tonte en cours"
+    icon: mdi:robot-mower
+  tonte_mode_zone_isolee:
+    name: "Tonte zone isolée en cours"
+    icon: mdi:floor-plan
+  tonte_zone_isolee_active:
+    name: "Zone isolée activée"
+    icon: mdi:floor-plan
+    # ═══ MODIFIER ICI : true pour activer, false pour désactiver ═══
+    initial: true
+  tonte_zone_confirmee:
+    name: "Zone confirmée pour cette session"
+    icon: mdi:check
+  tonte_session_ignoree:
+    name: "Session ignorée (ne pas compter)"
+    icon: mdi:cancel
+  tonte_reportee_aujourdhui:
+    name: "Tonte reportée aujourd'hui"
+    icon: mdi:calendar-arrow-right
+
+  # ┌──────────────────────────────────────────────────────────┐
+  # │         📅 CALENDRIER calendar.tondeuse                  │
+  # │                                                          │
+  # │  Pour DÉSACTIVER : mettre initial: false ci-dessous      │
+  # │  (aucun événement ne sera créé dans le calendrier)       │
+  # └──────────────────────────────────────────────────────────┘
+  tonte_calendrier_actif:
+    name: "Calendrier tondeuse activé"
+    icon: mdi:calendar-check
+    # ═══ MODIFIER ICI : true pour activer, false pour désactiver ═══
+    initial: true
+
+  # ┌──────────────────────────────────────────────────────────┐
+  # │         🤖 MODE FULL AUTONOME                            │
+  # │  Quand activé : la tondeuse démarre automatiquement      │
+  # │  si toutes les conditions sont réunies (jour de tonte,   │
+  # │  météo favorable, dans la plage horaire, pas le jour     │
+  # │  d'exclusion, pas en vacances). Une notification         │
+  # │  silencieuse est envoyée pour information.               │
+  # └──────────────────────────────────────────────────────────┘
+  tonte_mode_auto:
+    name: "Mode full autonome"
+    icon: mdi:robot-mower
+    initial: false
+
+  # Watchdog démarrage auto : true pendant l'attente de confirmation
+  # que la tondeuse est bien passée en mowing après ordre de démarrage
+  tonte_auto_watchdog_actif:
+    name: "Watchdog démarrage auto actif"
+    icon: mdi:timer-alert
+    initial: false
+
+input_select:
+  tonte_auto_jour_exclusion:
+    name: "Mode auto - Jour exclu"
+    icon: mdi:calendar-remove
+    options:
+      - aucun
+      - lundi
+      - mardi
+      - mercredi
+      - jeudi
+      - vendredi
+      - samedi
+      - dimanche
+    initial: dimanche
+
+input_number:
+  tonte_hauteur_override:
+    name: "Override hauteur"
+    min: 0
+    max: 8
+    step: 0.5
+    unit_of_measurement: "cm"
+    icon: mdi:ruler
+  tonte_seuil_pluie:
+    name: "Seuil pluie pour report"
+    min: 20
+    max: 80
+    step: 5
+    initial: 50
+    unit_of_measurement: "%"
+    icon: mdi:weather-rainy
+  tonte_seuil_batterie:
+    name: "Seuil alerte batterie"
+    min: 5
+    max: 30
+    step: 5
+    initial: 10
+    unit_of_measurement: "%"
+    icon: mdi:battery-alert
+
+  # ┌──────────────────────────────────────────────────────────┐
+  # │         ⏱️  TIMERS AVANCÉS (configurable en YAML)        │
+  # │                                                          │
+  # │  Ces valeurs sont les durées par défaut des timers.      │
+  # │  Modifiez les "initial:" selon vos besoins.              │
+  # └──────────────────────────────────────────────────────────┘
+
+  # Délai avant de considérer la tonte comme terminée
+  # après le retour à la base (en minutes). Défaut : 90 min.
+  tonte_delai_fin_detection:
+    name: "Délai fin de tonte (min)"
+    min: 15
+    max: 240
+    step: 15
+    # ═══ MODIFIER ICI : durée en minutes (défaut 90) ═══
+    initial: 90
+    unit_of_measurement: "min"
+    icon: mdi:timer-sand
+
+  # Raccourci batterie pleine : si la batterie atteint le seuil
+  # ci-dessous pendant la pause, le timer est réduit à cette durée.
+  tonte_seuil_batterie_raccourci:
+    name: "Seuil batterie raccourci timer (%)"
+    min: 80
+    max: 100
+    step: 5
+    # ═══ MODIFIER ICI : seuil % pour raccourci (défaut 100) ═══
+    initial: 100
+    unit_of_measurement: "%"
+    icon: mdi:battery-check
+
+  # Durée du raccourci quand la batterie atteint le seuil (en minutes)
+  tonte_delai_raccourci_batterie:
+    name: "Durée raccourci batterie (min)"
+    min: 5
+    max: 60
+    step: 5
+    # ═══ MODIFIER ICI : durée raccourci en minutes (défaut 15) ═══
+    initial: 15
+    unit_of_measurement: "min"
+    icon: mdi:timer-check
+
+  # Délai avant de demander la zone (en secondes). Défaut : 120s = 2 min.
+  tonte_delai_demande_zone:
+    name: "Délai demande zone (sec)"
+    min: 30
+    max: 600
+    step: 30
+    # ═══ MODIFIER ICI : durée en secondes (défaut 120 = 2 min) ═══
+    initial: 120
+    unit_of_measurement: "sec"
+    icon: mdi:timer-outline
+
+  # Nombre de jours de retard (× intervalle) avant alerte "pelouse en retard"
+  # Défaut : 2 × l'intervalle du mois. Ex : intervalle 3j → alerte à 6j
+  tonte_retard_multiplicateur:
+    name: "Retard avant alerte (× intervalle)"
+    min: 1
+    max: 5
+    step: 0.5
+    # ═══ MODIFIER ICI : multiplicateur (défaut 2) ═══
+    initial: 2
+    unit_of_measurement: "×"
+    icon: mdi:alert-circle-outline
+
+  # ═══════════════════════════════════════════════════════
+  #  PROFILS SAISONNIERS — intervalle (jours entre tontes)
+  #  0 = hivernage (pas de tonte ce mois-ci)
+  # ═══════════════════════════════════════════════════════
+  tonte_intervalle_01:
+    name: "Janvier - Intervalle"
+    min: 0
+    max: 14
+    step: 1
+    initial: 0
+    unit_of_measurement: "j"
+    icon: mdi:calendar
+  tonte_intervalle_02:
+    name: "Février - Intervalle"
+    min: 0
+    max: 14
+    step: 1
+    initial: 0
+    unit_of_measurement: "j"
+    icon: mdi:calendar
+  tonte_intervalle_03:
+    name: "Mars - Intervalle"
+    min: 0
+    max: 14
+    step: 1
+    initial: 5
+    unit_of_measurement: "j"
+    icon: mdi:calendar
+  tonte_intervalle_04:
+    name: "Avril - Intervalle"
+    min: 0
+    max: 14
+    step: 1
+    initial: 3
+    unit_of_measurement: "j"
+    icon: mdi:calendar
+  tonte_intervalle_05:
+    name: "Mai - Intervalle"
+    min: 0
+    max: 14
+    step: 1
+    initial: 3
+    unit_of_measurement: "j"
+    icon: mdi:calendar
+  tonte_intervalle_06:
+    name: "Juin - Intervalle"
+    min: 0
+    max: 14
+    step: 1
+    initial: 3
+    unit_of_measurement: "j"
+    icon: mdi:calendar
+  tonte_intervalle_07:
+    name: "Juillet - Intervalle"
+    min: 0
+    max: 14
+    step: 1
+    initial: 2
+    unit_of_measurement: "j"
+    icon: mdi:calendar
+  tonte_intervalle_08:
+    name: "Août - Intervalle"
+    min: 0
+    max: 14
+    step: 1
+    initial: 2
+    unit_of_measurement: "j"
+    icon: mdi:calendar
+  tonte_intervalle_09:
+    name: "Septembre - Intervalle"
+    min: 0
+    max: 14
+    step: 1
+    initial: 3
+    unit_of_measurement: "j"
+    icon: mdi:calendar
+  tonte_intervalle_10:
+    name: "Octobre - Intervalle"
+    min: 0
+    max: 14
+    step: 1
+    initial: 5
+    unit_of_measurement: "j"
+    icon: mdi:calendar
+  tonte_intervalle_11:
+    name: "Novembre - Intervalle"
+    min: 0
+    max: 14
+    step: 1
+    initial: 0
+    unit_of_measurement: "j"
+    icon: mdi:calendar
+  tonte_intervalle_12:
+    name: "Décembre - Intervalle"
+    min: 0
+    max: 14
+    step: 1
+    initial: 0
+    unit_of_measurement: "j"
+    icon: mdi:calendar
+
+  # ═══════════════════════════════════════════════════════
+  #  PROFILS SAISONNIERS — hauteur de coupe conseillée (cm)
+  #  0 = hivernage
+  # ═══════════════════════════════════════════════════════
+  tonte_hauteur_01:
+    name: "Janvier - Hauteur"
+    min: 0
+    max: 8
+    step: 0.5
+    initial: 0
+    unit_of_measurement: "cm"
+    icon: mdi:ruler
+  tonte_hauteur_02:
+    name: "Février - Hauteur"
+    min: 0
+    max: 8
+    step: 0.5
+    initial: 0
+    unit_of_measurement: "cm"
+    icon: mdi:ruler
+  tonte_hauteur_03:
+    name: "Mars - Hauteur"
+    min: 0
+    max: 8
+    step: 0.5
+    initial: 4.0
+    unit_of_measurement: "cm"
+    icon: mdi:ruler
+  tonte_hauteur_04:
+    name: "Avril - Hauteur"
+    min: 0
+    max: 8
+    step: 0.5
+    initial: 4.0
+    unit_of_measurement: "cm"
+    icon: mdi:ruler
+  tonte_hauteur_05:
+    name: "Mai - Hauteur"
+    min: 0
+    max: 8
+    step: 0.5
+    initial: 4.5
+    unit_of_measurement: "cm"
+    icon: mdi:ruler
+  tonte_hauteur_06:
+    name: "Juin - Hauteur"
+    min: 0
+    max: 8
+    step: 0.5
+    initial: 4.5
+    unit_of_measurement: "cm"
+    icon: mdi:ruler
+  tonte_hauteur_07:
+    name: "Juillet - Hauteur"
+    min: 0
+    max: 8
+    step: 0.5
+    initial: 5.0
+    unit_of_measurement: "cm"
+    icon: mdi:ruler
+  tonte_hauteur_08:
+    name: "Août - Hauteur"
+    min: 0
+    max: 8
+    step: 0.5
+    initial: 5.0
+    unit_of_measurement: "cm"
+    icon: mdi:ruler
+  tonte_hauteur_09:
+    name: "Septembre - Hauteur"
+    min: 0
+    max: 8
+    step: 0.5
+    initial: 4.5
+    unit_of_measurement: "cm"
+    icon: mdi:ruler
+  tonte_hauteur_10:
+    name: "Octobre - Hauteur"
+    min: 0
+    max: 8
+    step: 0.5
+    initial: 4.0
+    unit_of_measurement: "cm"
+    icon: mdi:ruler
+  tonte_hauteur_11:
+    name: "Novembre - Hauteur"
+    min: 0
+    max: 8
+    step: 0.5
+    initial: 0
+    unit_of_measurement: "cm"
+    icon: mdi:ruler
+  tonte_hauteur_12:
+    name: "Décembre - Hauteur"
+    min: 0
+    max: 8
+    step: 0.5
+    initial: 0
+    unit_of_measurement: "cm"
+    icon: mdi:ruler
+
+counter:
+  tonte_compteur_saison:
+    name: "Tontes jardin cette saison"
+    icon: mdi:counter
+    initial: 0
+    step: 1
+    restore: true
+  tonte_compteur_zone_isolee:
+    name: "Tontes zone isolée cette saison"
+    icon: mdi:floor-plan
+    initial: 0
+    step: 1
+    restore: true
+
+timer:
+  tonte_fin_detection:
+    name: "Détection fin de tonte"
+    icon: mdi:timer-sand
+    duration: "01:30:00"
+    restore: true
+  tonte_report_delai:
+    name: "Report de tonte différé"
+    icon: mdi:timer-outline
+    duration: "01:00:00"
+    restore: true
+
+
+# ============================================================
+#  2. TEMPLATE SENSORS
+# ============================================================
+
+template:
+  - sensor:
+      - name: "Tonte - Profil saisonnier"
+        unique_id: tonte_profil_saisonnier
+        icon: >
+          {% set m = now().month %}
+          {% if m in [11,12,1,2] %}mdi:snowflake{% elif m in [3,4,5] %}mdi:flower{% elif m in [6,7,8] %}mdi:white-balance-sunny{% else %}mdi:leaf{% endif %}
+        state: >
+          {% set m = now().month %}
+          {% set k = '{:02d}'.format(m) %}
+          {% set iv = states('input_number.tonte_intervalle_' ~ k) | int(5) %}
+          {% if iv == 0 %}hivernage
+          {% else %}
+            {% set noms = {1:'janvier',2:'février',3:'mars',4:'avril',5:'mai',6:'juin',7:'juillet',8:'août',9:'septembre',10:'octobre',11:'novembre',12:'décembre'} %}
+            {{ noms[m] }}
+          {% endif %}
+        attributes:
+          frequence_par_semaine: >
+            {% set m = now().month %}
+            {% set k = '{:02d}'.format(m) %}
+            {% set iv = states('input_number.tonte_intervalle_' ~ k) | int(0) %}
+            {% if iv == 0 %}0
+            {% elif iv <= 1 %}7
+            {% elif iv == 2 %}3 à 4
+            {% elif iv == 3 %}2 à 3
+            {% elif iv <= 5 %}1 à 2
+            {% else %}1
+            {% endif %}
+          hauteur_coupe_cm: >
+            {% set m = now().month %}
+            {% set k = '{:02d}'.format(m) %}
+            {{ states('input_number.tonte_hauteur_' ~ k) | float(4) }}
+          intervalle_jours: >
+            {% set m = now().month %}
+            {% set k = '{:02d}'.format(m) %}
+            {{ states('input_number.tonte_intervalle_' ~ k) | int(5) }}
+          est_hivernage: >
+            {% set m = now().month %}
+            {% set k = '{:02d}'.format(m) %}
+            {{ states('input_number.tonte_intervalle_' ~ k) | int(5) == 0 }}
+          description_mois: >
+            {% set m = now().month %}
+            {% set k = '{:02d}'.format(m) %}
+            {% set iv = states('input_number.tonte_intervalle_' ~ k) | int(0) %}
+            {% set h = states('input_number.tonte_hauteur_' ~ k) | float(0) %}
+            {% set noms = {1:'Janvier',2:'Février',3:'Mars',4:'Avril',5:'Mai',6:'Juin',7:'Juillet',8:'Août',9:'Septembre',10:'Octobre',11:'Novembre',12:'Décembre'} %}
+            {% if iv == 0 %}Hivernage - Repos hivernal
+            {% else %}
+              {% if iv <= 1 %}{{ noms[m] }} - 7 tontes/sem{% elif iv == 2 %}{{ noms[m] }} - 3 à 4 tontes/sem{% elif iv == 3 %}{{ noms[m] }} - 2 à 3 tontes/sem{% elif iv <= 5 %}{{ noms[m] }} - 1 à 2 tontes/sem{% else %}{{ noms[m] }} - 1 tonte/sem{% endif %}, hauteur conseillée {{ h }} cm
+            {% endif %}
+
+      - name: "Navimow - État"
+        unique_id: navimow_etat_fr
+        icon: >
+          {% set s = states('lawn_mower.navimow_VOTRE_MODELE') %}
+          {% if s == 'mowing' %}mdi:robot-mower{% elif s == 'docked' %}mdi:battery-charging{% elif s == 'paused' %}mdi:pause-circle{% elif s == 'returning' %}mdi:home-import-outline{% elif s == 'error' %}mdi:alert-circle{% else %}mdi:robot-mower-outline{% endif %}
+        state: >
+          {% set s = states('lawn_mower.navimow_VOTRE_MODELE') %}
+          {% set session = is_state('input_boolean.tonte_session_active', 'on') %}
+          {% set zone_iso = is_state('input_boolean.tonte_mode_zone_isolee', 'on') %}
+          {% set trad = {'mowing':'En tonte','docked':'Sur la base','paused':'En pause','returning':'Retour base','error':'Erreur'} %}
+          {% if s == 'mowing' and zone_iso %}En tonte ({{ states('input_text.tonte_zone_isolee_nom') | lower }})
+          {% elif s == 'docked' and session %}En recharge (tonte en cours)
+          {% else %}{{ trad.get(s, s) }}{% endif %}
+        attributes:
+          etat_brut: "{{ states('lawn_mower.navimow_VOTRE_MODELE') }}"
+          batterie: "{{ states('sensor.navimow_VOTRE_MODELE_batterie') | int(0) }}"
+          session_active: "{{ is_state('input_boolean.tonte_session_active', 'on') }}"
+
+      - name: "Tonte - Jours écoulés"
+        unique_id: tonte_jours_ecoules
+        icon: mdi:counter
+        unit_of_measurement: "jours"
+        state: >
+          {% set d = states('input_datetime.tonte_derniere_date') %}
+          {% if d in ['unknown','unavailable','None',''] %}99
+          {% else %}{{ (now().date() - strptime(d, '%Y-%m-%d').date()).days }}{% endif %}
+
+      - name: "Tonte - Jour planifié"
+        unique_id: tonte_jour_planifie
+        icon: mdi:calendar-question
+        state: >
+          {% set m = now().month %}
+          {% set k = '{:02d}'.format(m) %}
+          {% set iv = states('input_number.tonte_intervalle_' ~ k) | int(5) %}
+          {% set fh = is_state('input_boolean.tonte_hivernage_force', 'on') %}
+          {% if iv == 0 or fh %}non
+          {% else %}
+            {% set je = states('sensor.tonte_jours_ecoules') | int(99) %}
+            {{ 'oui' if (je >= iv and je >= 2) else 'non' }}
+          {% endif %}
+
+      - name: "Tonte - Météo favorable"
+        unique_id: tonte_meteo_favorable
+        icon: "{% if is_state('sensor.tonte_meteo_favorable', 'oui') %}mdi:weather-sunny{% else %}mdi:weather-pouring{% endif %}"
+        state: >
+          {% set seuil = states('input_number.tonte_seuil_pluie') | float(50) %}
+          {% set rc = states('sensor.breteuil_rain_chance') | float(-1) %}
+          {% if rc >= 0 %}{{ 'non' if rc > seuil else 'oui' }}
+          {% else %}
+            {% set c = state_attr('weather.breteuil', 'condition') | default('unknown') %}
+            {{ 'non' if c in ['rainy','pouring','lightning-rainy','snowy','snowy-rainy','hail','exceptional'] else 'oui' }}
+          {% endif %}
+        attributes:
+          rain_chance: "{{ states('sensor.breteuil_rain_chance') | float(0) }}%"
+          condition_meteo: "{{ state_attr('weather.breteuil', 'condition') | default('inconnu') }}"
+          temperature: "{{ state_attr('weather.breteuil', 'temperature') | default('?') }}°C"
+          meteo_demain: >
+            {% set fc = state_attr('weather.breteuil', 'forecast') %}
+            {% if fc and fc | length > 1 %}
+              {% set c = fc[1].condition | default('unknown') %}
+              {% if c in ['rainy','pouring','lightning-rainy','snowy','snowy-rainy','hail'] %}défavorable{% else %}favorable{% endif %}
+            {% else %}inconnu{% endif %}
+
+      - name: "Tonte - Décision du jour"
+        unique_id: tonte_decision_jour
+        icon: >
+          {% set d = states('sensor.tonte_decision_du_jour') %}
+          {% if d == 'tondre' %}mdi:robot-mower{% elif d == 'reporte_pluie' %}mdi:weather-pouring{% elif d == 'reporte_manuel' %}mdi:calendar-arrow-right{% elif d == 'hivernage' %}mdi:snowflake{% elif d == 'effectuee' %}mdi:check-circle{% elif d == 'en_cours' %}mdi:robot-mower{% else %}mdi:sleep{% endif %}
+        state: >
+          {% set m = now().month %}
+          {% set k = '{:02d}'.format(m) %}
+          {% set iv = states('input_number.tonte_intervalle_' ~ k) | int(5) %}
+          {% set fh = is_state('input_boolean.tonte_hivernage_force', 'on') %}
+          {% set je = states('sensor.tonte_jours_ecoules') | int(99) %}
+          {% set sess = is_state('input_boolean.tonte_session_active', 'on') %}
+          {% set mow = is_state('lawn_mower.navimow_VOTRE_MODELE', 'mowing') %}
+          {% if iv == 0 or fh %}hivernage
+          {% elif mow or sess %}en_cours
+          {% elif je == 0 %}effectuee
+          {% elif is_state('sensor.tonte_jour_planifie', 'non') %}pas_prevu
+          {% elif is_state('input_boolean.tonte_reportee_aujourdhui', 'on') %}reporte_manuel
+          {% elif is_state('sensor.tonte_meteo_favorable', 'non') %}reporte_pluie
+          {% else %}tondre{% endif %}
+        attributes:
+          hauteur_recommandee: >
+            {% set o = states('input_number.tonte_hauteur_override') | float(0) %}
+            {% if o > 0 %}{{ o }}
+            {% else %}
+              {% set m = now().month %}
+              {% set k = '{:02d}'.format(m) %}
+              {{ states('input_number.tonte_hauteur_' ~ k) | float(4) }}
+            {% endif %}
+          prochaine_tonte_estimee: >
+            {% set je = states('sensor.tonte_jours_ecoules') | int(0) %}
+            {% set m = now().month %}
+            {% set k = '{:02d}'.format(m) %}
+            {% set iv = states('input_number.tonte_intervalle_' ~ k) | int(5) %}
+            {% if je == 0 %}Dans {{ iv }} jour(s)
+            {% else %}
+              {% set r = iv - je %}
+              {% if r < 2 - je %}{% set r = 2 - je %}{% endif %}
+              {% if r <= 0 %}Aujourd'hui ou dès que possible
+              {% else %}Dans {{ r }} jour(s){% endif %}
+            {% endif %}
+          tontes_saison: "{{ states('counter.tonte_compteur_saison') | int(0) }}"
+          tontes_zone_isolee: "{{ states('counter.tonte_compteur_zone_isolee') | int(0) }}"
+
+
+# ============================================================
+#  3. SCRIPTS
+# ============================================================
+
+script:
+  tonte_marquer_effectuee:
+    alias: "🌿 Marquer jardin effectuée"
+    icon: mdi:check-circle-outline
+    sequence:
+      - service: input_datetime.set_datetime
+        target:
+          entity_id: input_datetime.tonte_derniere_date
+        data:
+          date: "{{ now().strftime('%Y-%m-%d') }}"
+      - service: counter.increment
+        target:
+          entity_id: counter.tonte_compteur_saison
+      - service: input_boolean.turn_off
+        target:
+          entity_id: input_boolean.tonte_session_active
+      - service: input_boolean.turn_off
+        target:
+          entity_id: input_boolean.tonte_mode_zone_isolee
+      - service: input_boolean.turn_off
+        target:
+          entity_id: input_boolean.tonte_zone_confirmee
+      - service: input_boolean.turn_off
+        target:
+          entity_id: input_boolean.tonte_session_ignoree
+      - service: timer.cancel
+        target:
+          entity_id: timer.tonte_fin_detection
+      - service: persistent_notification.dismiss
+        data:
+          notification_id: "tonte_du_jour"
+      - if:
+          - condition: state
+            entity_id: input_boolean.tonte_calendrier_actif
+            state: "on"
+        then:
+          - service: calendar.create_event
+            target:
+              entity_id: calendar.tondeuse
+            data:
+              summary: "🌿 Tonte jardin #{{ states('counter.tonte_compteur_saison') }}"
+              description: >
+                Tonte jardin effectuée.
+                Batterie restante : {{ states('sensor.navimow_VOTRE_MODELE_batterie') | int(0) }}%
+                Hauteur conseillée : {{ state_attr('sensor.tonte_decision_du_jour', 'hauteur_recommandee') | float(4) }} cm
+                Profil : {{ states('sensor.tonte_profil_saisonnier') | replace('_', ' ') | title }}
+              start_date: "{{ now().strftime('%Y-%m-%d') }}"
+              end_date: "{{ (now() + timedelta(days=1)).strftime('%Y-%m-%d') }}"
+
+  tonte_marquer_zone_isolee:
+    alias: "🌿 Marquer zone isolée effectuée"
+    icon: mdi:floor-plan
+    sequence:
+      - service: counter.increment
+        target:
+          entity_id: counter.tonte_compteur_zone_isolee
+      - service: input_boolean.turn_off
+        target:
+          entity_id: input_boolean.tonte_session_active
+      - service: input_boolean.turn_off
+        target:
+          entity_id: input_boolean.tonte_mode_zone_isolee
+      - service: input_boolean.turn_off
+        target:
+          entity_id: input_boolean.tonte_zone_confirmee
+      - service: input_boolean.turn_off
+        target:
+          entity_id: input_boolean.tonte_session_ignoree
+      - service: timer.cancel
+        target:
+          entity_id: timer.tonte_fin_detection
+      - if:
+          - condition: state
+            entity_id: input_boolean.tonte_calendrier_actif
+            state: "on"
+        then:
+          - service: calendar.create_event
+            target:
+              entity_id: calendar.tondeuse
+            data:
+              summary: "🏠 Tonte {{ states('input_text.tonte_zone_isolee_nom') }} #{{ states('counter.tonte_compteur_zone_isolee') }}"
+              description: >
+                Tonte zone isolée effectuée.
+                Batterie restante : {{ states('sensor.navimow_VOTRE_MODELE_batterie') | int(0) }}%
+              start_date: "{{ now().strftime('%Y-%m-%d') }}"
+              end_date: "{{ (now() + timedelta(days=1)).strftime('%Y-%m-%d') }}"
+
+  tonte_lancer:
+    alias: "🌿 Lancer la tondeuse"
+    icon: mdi:robot-mower
+    sequence:
+      - service: lawn_mower.start_mowing
+        target:
+          entity_id: lawn_mower.navimow_VOTRE_MODELE
+
+  tonte_pause:
+    alias: "🌿 Mettre en pause"
+    icon: mdi:pause
+    sequence:
+      - service: lawn_mower.pause
+        target:
+          entity_id: lawn_mower.navimow_VOTRE_MODELE
+
+  tonte_retour_base:
+    alias: "🌿 Retour à la base"
+    icon: mdi:home-import-outline
+    sequence:
+      - service: lawn_mower.dock
+        target:
+          entity_id: lawn_mower.navimow_VOTRE_MODELE
+
+
+# ============================================================
+#  4. AUTOMATIONS
+# ============================================================
+
+automation:
+
+  - id: tonte_session_debut
+    alias: "🌿 Début de session"
+    trigger:
+      - platform: state
+        entity_id: lawn_mower.navimow_VOTRE_MODELE
+        to: "mowing"
+    condition:
+      - condition: state
+        entity_id: input_boolean.tonte_session_active
+        state: "off"
+    action:
+      - service: input_boolean.turn_on
+        target:
+          entity_id: input_boolean.tonte_session_active
+      - service: timer.cancel
+        target:
+          entity_id: timer.tonte_fin_detection
+
+  - id: tonte_demande_zone
+    alias: "🌿 Demande zone après délai configurable"
+    trigger:
+      - platform: state
+        entity_id: lawn_mower.navimow_VOTRE_MODELE
+        to: "mowing"
+    condition:
+      - condition: state
+        entity_id: input_boolean.tonte_zone_confirmee
+        state: "off"
+      - condition: state
+        entity_id: input_boolean.tonte_mode_zone_isolee
+        state: "off"
+      - condition: template
+        value_template: "{{ states('input_select.tonte_mode_notification') == 'telegram' }}"
+      - condition: state
+        entity_id: input_boolean.tonte_mode_vacances
+        state: "off"
+      # En mode auto, pas de demande de zone — c'est forcément le jardin
+      - condition: state
+        entity_id: input_boolean.tonte_mode_auto
+        state: "off"
+    action:
+      - delay:
+          seconds: "{{ states('input_number.tonte_delai_demande_zone') | int(120) }}"
+      # Re-vérifier que la tonte est toujours en cours après le délai
+      - condition: state
+        entity_id: lawn_mower.navimow_VOTRE_MODELE
+        state: "mowing"
+      - condition: state
+        entity_id: input_boolean.tonte_zone_confirmee
+        state: "off"
+      - choose:
+          # Zone isolée activée → 3 boutons
+          - conditions:
+              - condition: state
+                entity_id: input_boolean.tonte_zone_isolee_active
+                state: "on"
+            sequence:
+              - service: telegram_bot.send_message
+                data:
+                  parse_mode: html
+                  message: "🤖 <b>Tonte détectée !</b> Quelle zone ?"
+                  inline_keyboard:
+                    - - "🌿 Jardin:/tonte_zone_jardin"
+                      - "🏠 {{ states('input_text.tonte_zone_isolee_nom') }}:/tonte_zone_isolee"
+                      - "❌ Ignorer:/tonte_zone_ignorer"
+        # Zone isolée désactivée → 2 boutons
+        default:
+          - service: telegram_bot.send_message
+            data:
+              parse_mode: html
+              message: "🤖 <b>Tonte détectée !</b> Quelle zone ?"
+              inline_keyboard:
+                - - "🌿 Jardin:/tonte_zone_jardin"
+                  - "❌ Ignorer:/tonte_zone_ignorer"
+
+  - id: tonte_retour_base_timer
+    alias: "🌿 Retour base, timer"
+    description: >
+      Démarre le timer de sécurité au retour base.
+      Sert de fallback si la détection batterie ne fonctionne pas.
+    trigger:
+      - platform: state
+        entity_id: lawn_mower.navimow_VOTRE_MODELE
+        to: "docked"
+    condition:
+      - condition: state
+        entity_id: input_boolean.tonte_session_active
+        state: "on"
+    action:
+      - service: timer.start
+        target:
+          entity_id: timer.tonte_fin_detection
+        data:
+          duration: "{{ (states('input_number.tonte_delai_fin_detection') | int(90) * 60) }}"
+
+  - id: tonte_reprise_apres_recharge
+    alias: "🌿 Reprise après recharge"
+    trigger:
+      - platform: state
+        entity_id: lawn_mower.navimow_VOTRE_MODELE
+        to: "mowing"
+    condition:
+      - condition: state
+        entity_id: input_boolean.tonte_session_active
+        state: "on"
+      - condition: state
+        entity_id: timer.tonte_fin_detection
+        state: "active"
+    action:
+      - service: timer.cancel
+        target:
+          entity_id: timer.tonte_fin_detection
+
+  - id: tonte_batterie_pleine
+    alias: "🌿 Batterie ≥95% stable → fin de tonte (Option B)"
+    description: >
+      Détection intelligente de fin de tonte :
+      Si session active + tondeuse dockée + batterie ≥ 95% stable
+      depuis 5 min + pas de reprise entre-temps → fin de tonte.
+      Plus fiable que le timer statique (confirmé terrain).
+    trigger:
+      - platform: numeric_state
+        entity_id: sensor.navimow_VOTRE_MODELE_batterie
+        above: 94
+        for:
+          minutes: 5
+    condition:
+      - condition: state
+        entity_id: input_boolean.tonte_session_active
+        state: "on"
+      - condition: state
+        entity_id: lawn_mower.navimow_VOTRE_MODELE
+        state: "docked"
+      # La tondeuse n'est pas repartie pendant les 5 min
+      - condition: state
+        entity_id: lawn_mower.navimow_VOTRE_MODELE
+        state: "docked"
+        for:
+          minutes: 5
+    action:
+      # Annuler le timer de sécurité — la batterie a confirmé la fin
+      - service: timer.cancel
+        target:
+          entity_id: timer.tonte_fin_detection
+      # Déclencher manuellement l'événement de fin
+      - event: tonte_fin_confirmee_batterie
+        event_data:
+          source: "batterie_stable"
+
+  - id: tonte_fin_detectee
+    alias: "🌿 Fin détectée"
+    trigger:
+      - platform: event
+        event_type: timer.finished
+        event_data:
+          entity_id: timer.tonte_fin_detection
+      # Détection intelligente via batterie ≥95% stable 5 min
+      - platform: event
+        event_type: tonte_fin_confirmee_batterie
+    action:
+      - choose:
+          # Session ignorée — juste reset, pas de comptabilisation
+          - conditions:
+              - condition: state
+                entity_id: input_boolean.tonte_session_ignoree
+                state: "on"
+            sequence:
+              - service: input_boolean.turn_off
+                target:
+                  entity_id: input_boolean.tonte_session_active
+              - service: input_boolean.turn_off
+                target:
+                  entity_id: input_boolean.tonte_mode_zone_isolee
+              - service: input_boolean.turn_off
+                target:
+                  entity_id: input_boolean.tonte_zone_confirmee
+              - service: input_boolean.turn_off
+                target:
+                  entity_id: input_boolean.tonte_session_ignoree
+              - service: timer.cancel
+                target:
+                  entity_id: timer.tonte_fin_detection
+              - condition: state
+                entity_id: input_boolean.tonte_mode_vacances
+                state: "off"
+              - choose:
+                  - conditions:
+                      - condition: state
+                        entity_id: input_select.tonte_mode_notification
+                        state: "telegram"
+                    sequence:
+                      - service: telegram_bot.send_message
+                        data:
+                          parse_mode: html
+                          message: "ℹ️ Tonte terminée (non comptabilisée)."
+          # Zone isolée
+          - conditions:
+              - condition: state
+                entity_id: input_boolean.tonte_mode_zone_isolee
+                state: "on"
+            sequence:
+              - service: script.tonte_marquer_zone_isolee
+              - condition: state
+                entity_id: input_boolean.tonte_mode_vacances
+                state: "off"
+              - choose:
+                  - conditions:
+                      - condition: state
+                        entity_id: input_select.tonte_mode_notification
+                        state: "telegram"
+                    sequence:
+                      - service: telegram_bot.send_message
+                        data:
+                          parse_mode: html
+                          message: "✅ <b>Tonte {{ states('input_text.tonte_zone_isolee_nom') }} terminée !</b> 🔋 {{ states('sensor.navimow_VOTRE_MODELE_batterie') | int(0) }}% · {{ states('input_text.tonte_zone_isolee_nom') }} n°{{ states('counter.tonte_compteur_zone_isolee') }}"
+                  - conditions:
+                      - condition: state
+                        entity_id: input_select.tonte_mode_notification
+                        state: "mobile"
+                    sequence:
+                      - service: notify.mobile_app_pixel_9a
+                        data:
+                          title: "✅ {{ states('input_text.tonte_zone_isolee_nom') }} terminée !"
+                          message: "Batterie : {{ states('sensor.navimow_VOTRE_MODELE_batterie') | int(0) }}%"
+                          data:
+                            tag: "tonte_du_jour"
+                            channel: "Tonte"
+        default:
+          - service: script.tonte_marquer_effectuee
+          - condition: state
+            entity_id: input_boolean.tonte_mode_vacances
+            state: "off"
+          - choose:
+              - conditions:
+                  - condition: state
+                    entity_id: input_select.tonte_mode_notification
+                    state: "telegram"
+                sequence:
+                  - service: telegram_bot.send_message
+                    data:
+                      parse_mode: html
+                      message: >-
+                        ✅ <b>Tonte jardin terminée !</b>
+
+                        🔋 {{ states('sensor.navimow_VOTRE_MODELE_batterie') | int(0) }}%
+                        🔢 Tonte n°{{ states('counter.tonte_compteur_saison') }}
+                        ➡️ Prochaine dans ~{{ state_attr('sensor.tonte_profil_saisonnier', 'intervalle_jours') | int(5) }} jours
+              - conditions:
+                  - condition: state
+                    entity_id: input_select.tonte_mode_notification
+                    state: "mobile"
+                sequence:
+                  - service: notify.mobile_app_pixel_9a
+                    data:
+                      title: "✅ Tonte terminée !"
+                      message: "Batterie : {{ states('sensor.navimow_VOTRE_MODELE_batterie') | int(0) }}% · Tonte n°{{ states('counter.tonte_compteur_saison') }}"
+                      data:
+                        tag: "tonte_du_jour"
+                        channel: "Tonte"
+
+  - id: tonte_notification_matin
+    alias: "🌿 Notification du matin"
+    trigger:
+      - platform: time
+        at: input_datetime.tonte_heure_notification
+    condition:
+      - condition: state
+        entity_id: input_boolean.tonte_mode_vacances
+        state: "off"
+      - condition: template
+        value_template: "{{ states('input_select.tonte_mode_notification') != 'aucune' }}"
+      - condition: template
+        value_template: "{{ states('sensor.tonte_decision_du_jour') in ['tondre', 'reporte_pluie'] }}"
+      # En mode auto, pas de notification de proposition le matin
+      # (le démarrage auto se charge de tout)
+      - condition: state
+        entity_id: input_boolean.tonte_mode_auto
+        state: "off"
+    action:
+      - choose:
+          - conditions:
+              - condition: state
+                entity_id: sensor.tonte_decision_du_jour
+                state: "tondre"
+              - condition: state
+                entity_id: input_select.tonte_mode_notification
+                state: "telegram"
+            sequence:
+              - service: telegram_bot.send_message
+                data:
+                  parse_mode: html
+                  message: >-
+                    🌿 <b>Jour de tonte !</b>
+
+                    📏 Hauteur conseillée : {{ state_attr('sensor.tonte_decision_du_jour', 'hauteur_recommandee') | float(4) }} cm
+                    🔋 Batterie : {{ states('sensor.navimow_VOTRE_MODELE_batterie') | int(0) }}%
+                    📅 Dernière tonte il y a {{ states('sensor.tonte_jours_ecoules') }} jour(s)
+                    🔢 Ce sera la tonte n°{{ states('counter.tonte_compteur_saison') | int(0) + 1 }}
+                  inline_keyboard:
+                    - "🚀 Lancer:/tonte_lancer, ⏭️ Reporter:/tonte_reporter_menu"
+          - conditions:
+              - condition: state
+                entity_id: sensor.tonte_decision_du_jour
+                state: "tondre"
+              - condition: state
+                entity_id: input_select.tonte_mode_notification
+                state: "mobile"
+            sequence:
+              - service: notify.mobile_app_pixel_9a
+                data:
+                  title: "🌿 Jour de tonte !"
+                  message: "Hauteur conseillée : {{ state_attr('sensor.tonte_decision_du_jour', 'hauteur_recommandee') | float(4) }} cm · Batterie : {{ states('sensor.navimow_VOTRE_MODELE_batterie') | int(0) }}%"
+                  data:
+                    actions:
+                      - action: "TONTE_LANCER"
+                        title: "🚀 Lancer"
+                      - action: "TONTE_REPORTEE_MANUELLEMENT"
+                        title: "⏭️ Reporter"
+                    tag: "tonte_du_jour"
+                    importance: high
+                    channel: "Tonte"
+          - conditions:
+              - condition: state
+                entity_id: sensor.tonte_decision_du_jour
+                state: "reporte_pluie"
+              - condition: state
+                entity_id: input_select.tonte_mode_notification
+                state: "telegram"
+            sequence:
+              - service: telegram_bot.send_message
+                data:
+                  parse_mode: html
+                  message: >-
+                    🌧️ <b>Tonte reportée — Pluie</b>
+
+                    💧 Risque : {{ state_attr('sensor.tonte_meteo_favorable', 'rain_chance') }}
+                    {% set dm = state_attr('sensor.tonte_meteo_favorable', 'meteo_demain') | default('inconnu') %}{% if dm == 'favorable' %}☀️ Demain favorable.{% elif dm == 'défavorable' %}🌧️ Pluie aussi demain.{% else %}🔄 Reproposé demain.{% endif %}
+                  inline_keyboard:
+                    - "🚀 Forcer:/tonte_lancer"
+          - conditions:
+              - condition: state
+                entity_id: sensor.tonte_decision_du_jour
+                state: "reporte_pluie"
+              - condition: state
+                entity_id: input_select.tonte_mode_notification
+                state: "mobile"
+            sequence:
+              - service: notify.mobile_app_pixel_9a
+                data:
+                  title: "🌧️ Tonte reportée"
+                  message: "Risque pluie {{ state_attr('sensor.tonte_meteo_favorable', 'rain_chance') }}."
+                  data:
+                    tag: "tonte_du_jour"
+                    channel: "Tonte"
+
+  - id: tonte_report_delai_expire
+    alias: "🌿 Report différé expiré"
+    trigger:
+      - platform: event
+        event_type: timer.finished
+        event_data:
+          entity_id: timer.tonte_report_delai
+    condition:
+      - condition: state
+        entity_id: input_boolean.tonte_mode_vacances
+        state: "off"
+    action:
+      - service: input_boolean.turn_off
+        target:
+          entity_id: input_boolean.tonte_reportee_aujourdhui
+      - choose:
+          - conditions:
+              - condition: state
+                entity_id: input_select.tonte_mode_notification
+                state: "telegram"
+            sequence:
+              - service: telegram_bot.send_message
+                data:
+                  parse_mode: html
+                  message: "🔔 <b>Rappel tonte !</b> 🔋 {{ states('sensor.navimow_VOTRE_MODELE_batterie') | int(0) }}%"
+                  inline_keyboard:
+                    - "🚀 Lancer:/tonte_lancer, ⏭️ Reporter:/tonte_reporter_menu"
+          - conditions:
+              - condition: state
+                entity_id: input_select.tonte_mode_notification
+                state: "mobile"
+            sequence:
+              - service: notify.mobile_app_pixel_9a
+                data:
+                  title: "🔔 Rappel tonte !"
+                  message: "Batterie : {{ states('sensor.navimow_VOTRE_MODELE_batterie') | int(0) }}%"
+                  data:
+                    actions:
+                      - action: "TONTE_LANCER"
+                        title: "🚀 Lancer"
+                    tag: "tonte_du_jour"
+                    importance: high
+                    channel: "Tonte"
+
+  # ═══ CALLBACKS TELEGRAM (action first + continue_on_error) ═══
+
+  - id: tonte_telegram_lancer
+    alias: "🌿 TG - Lancer"
+    trigger:
+      - platform: state
+        entity_id: event.ha_maison_update_event
+    condition:
+      - condition: state
+        entity_id: event.ha_maison_update_event
+        attribute: event_type
+        state: telegram_callback
+      - condition: template
+        value_template: "{{ trigger.to_state.attributes.data == '/tonte_lancer' }}"
+    action:
+      - service: lawn_mower.start_mowing
+        target:
+          entity_id: lawn_mower.navimow_VOTRE_MODELE
+      - service: telegram_bot.answer_callback_query
+        data:
+          callback_query_id: "{{ trigger.to_state.attributes.id }}"
+          message: "🚀 Lancé !"
+        continue_on_error: true
+      - service: telegram_bot.send_message
+        data:
+          parse_mode: html
+          message: "🚀 <b>Tonte lancée !</b> 🔋 {{ states('sensor.navimow_VOTRE_MODELE_batterie') | int(0) }}%"
+
+  - id: tonte_telegram_reporter_menu
+    alias: "🌿 TG - Menu reporter"
+    trigger:
+      - platform: state
+        entity_id: event.ha_maison_update_event
+    condition:
+      - condition: state
+        entity_id: event.ha_maison_update_event
+        attribute: event_type
+        state: telegram_callback
+      - condition: template
+        value_template: "{{ trigger.to_state.attributes.data == '/tonte_reporter_menu' }}"
+    action:
+      - service: telegram_bot.answer_callback_query
+        data:
+          callback_query_id: "{{ trigger.to_state.attributes.id }}"
+          message: "⏭️ Choisir le délai"
+        continue_on_error: true
+      - service: telegram_bot.send_message
+        data:
+          parse_mode: html
+          message: "⏭️ <b>Reporter de combien ?</b>"
+          inline_keyboard:
+            - "1h:/tonte_delay_1h, 2h:/tonte_delay_2h"
+            - "4h:/tonte_delay_4h, Demain:/tonte_delay_demain"
+
+  - id: tonte_telegram_delay_1h
+    alias: "🌿 TG - 1h"
+    trigger:
+      - platform: state
+        entity_id: event.ha_maison_update_event
+    condition:
+      - condition: state
+        entity_id: event.ha_maison_update_event
+        attribute: event_type
+        state: telegram_callback
+      - condition: template
+        value_template: "{{ trigger.to_state.attributes.data == '/tonte_delay_1h' }}"
+    action:
+      - service: input_boolean.turn_on
+        target:
+          entity_id: input_boolean.tonte_reportee_aujourdhui
+      - service: timer.start
+        target:
+          entity_id: timer.tonte_report_delai
+        data:
+          duration: "01:00:00"
+      - service: telegram_bot.answer_callback_query
+        data:
+          callback_query_id: "{{ trigger.to_state.attributes.id }}"
+          message: "⏰ 1h"
+        continue_on_error: true
+      - service: telegram_bot.send_message
+        data:
+          parse_mode: html
+          message: "⏰ C'est noté ! Rappel dans 1 heure."
+
+  - id: tonte_telegram_delay_2h
+    alias: "🌿 TG - 2h"
+    trigger:
+      - platform: state
+        entity_id: event.ha_maison_update_event
+    condition:
+      - condition: state
+        entity_id: event.ha_maison_update_event
+        attribute: event_type
+        state: telegram_callback
+      - condition: template
+        value_template: "{{ trigger.to_state.attributes.data == '/tonte_delay_2h' }}"
+    action:
+      - service: input_boolean.turn_on
+        target:
+          entity_id: input_boolean.tonte_reportee_aujourdhui
+      - service: timer.start
+        target:
+          entity_id: timer.tonte_report_delai
+        data:
+          duration: "02:00:00"
+      - service: telegram_bot.answer_callback_query
+        data:
+          callback_query_id: "{{ trigger.to_state.attributes.id }}"
+          message: "⏰ 2h"
+        continue_on_error: true
+      - service: telegram_bot.send_message
+        data:
+          parse_mode: html
+          message: "⏰ C'est noté ! Rappel dans 2 heures."
+
+  - id: tonte_telegram_delay_4h
+    alias: "🌿 TG - 4h"
+    trigger:
+      - platform: state
+        entity_id: event.ha_maison_update_event
+    condition:
+      - condition: state
+        entity_id: event.ha_maison_update_event
+        attribute: event_type
+        state: telegram_callback
+      - condition: template
+        value_template: "{{ trigger.to_state.attributes.data == '/tonte_delay_4h' }}"
+    action:
+      - service: input_boolean.turn_on
+        target:
+          entity_id: input_boolean.tonte_reportee_aujourdhui
+      - service: timer.start
+        target:
+          entity_id: timer.tonte_report_delai
+        data:
+          duration: "04:00:00"
+      - service: telegram_bot.answer_callback_query
+        data:
+          callback_query_id: "{{ trigger.to_state.attributes.id }}"
+          message: "⏰ 4h"
+        continue_on_error: true
+      - service: telegram_bot.send_message
+        data:
+          parse_mode: html
+          message: "⏰ C'est noté ! Rappel dans 4 heures."
+
+  - id: tonte_telegram_delay_demain
+    alias: "🌿 TG - Demain"
+    trigger:
+      - platform: state
+        entity_id: event.ha_maison_update_event
+    condition:
+      - condition: state
+        entity_id: event.ha_maison_update_event
+        attribute: event_type
+        state: telegram_callback
+      - condition: template
+        value_template: "{{ trigger.to_state.attributes.data == '/tonte_delay_demain' }}"
+    action:
+      - service: input_boolean.turn_on
+        target:
+          entity_id: input_boolean.tonte_reportee_aujourdhui
+      - service: telegram_bot.answer_callback_query
+        data:
+          callback_query_id: "{{ trigger.to_state.attributes.id }}"
+          message: "⏭️ Demain"
+        continue_on_error: true
+      - service: telegram_bot.send_message
+        data:
+          parse_mode: html
+          message: "⏭️ C'est noté ! Reproposé demain matin."
+
+  - id: tonte_telegram_retour_base
+    alias: "🌿 TG - Base"
+    trigger:
+      - platform: state
+        entity_id: event.ha_maison_update_event
+    condition:
+      - condition: state
+        entity_id: event.ha_maison_update_event
+        attribute: event_type
+        state: telegram_callback
+      - condition: template
+        value_template: "{{ trigger.to_state.attributes.data == '/tonte_retour_base' }}"
+    action:
+      - service: lawn_mower.dock
+        target:
+          entity_id: lawn_mower.navimow_VOTRE_MODELE
+      - service: telegram_bot.answer_callback_query
+        data:
+          callback_query_id: "{{ trigger.to_state.attributes.id }}"
+          message: "🏠 OK !"
+        continue_on_error: true
+      - service: telegram_bot.send_message
+        data:
+          parse_mode: html
+          message: "🏠 C'est noté ! Navimow retourne à sa base."
+
+  - id: tonte_telegram_effectuee
+    alias: "🌿 TG - Effectuée"
+    trigger:
+      - platform: state
+        entity_id: event.ha_maison_update_event
+    condition:
+      - condition: state
+        entity_id: event.ha_maison_update_event
+        attribute: event_type
+        state: telegram_callback
+      - condition: template
+        value_template: "{{ trigger.to_state.attributes.data == '/tonte_effectuee' }}"
+    action:
+      - service: script.tonte_marquer_effectuee
+      - service: telegram_bot.answer_callback_query
+        data:
+          callback_query_id: "{{ trigger.to_state.attributes.id }}"
+          message: "✅ OK !"
+        continue_on_error: true
+      - service: telegram_bot.send_message
+        data:
+          parse_mode: html
+          message: "✅ C'est noté ! Prochaine dans ~{{ state_attr('sensor.tonte_profil_saisonnier', 'intervalle_jours') | int(5) }} jours."
+
+  - id: tonte_telegram_zone_jardin
+    alias: "🌿 TG - Jardin"
+    trigger:
+      - platform: state
+        entity_id: event.ha_maison_update_event
+    condition:
+      - condition: state
+        entity_id: event.ha_maison_update_event
+        attribute: event_type
+        state: telegram_callback
+      - condition: template
+        value_template: "{{ trigger.to_state.attributes.data == '/tonte_zone_jardin' }}"
+    action:
+      - service: input_boolean.turn_off
+        target:
+          entity_id: input_boolean.tonte_mode_zone_isolee
+      - service: input_boolean.turn_on
+        target:
+          entity_id: input_boolean.tonte_zone_confirmee
+      - service: telegram_bot.answer_callback_query
+        data:
+          callback_query_id: "{{ trigger.to_state.attributes.id }}"
+          message: "🌿 Jardin !"
+        continue_on_error: true
+      - service: telegram_bot.send_message
+        data:
+          parse_mode: html
+          message: >-
+            🌿 <b>Tonte jardin en cours</b>
+            🔋 {{ states('sensor.navimow_VOTRE_MODELE_batterie') | int(0) }}%
+            📏 Hauteur conseillée : {{ state_attr('sensor.tonte_decision_du_jour', 'hauteur_recommandee') | float(4) }} cm
+
+  - id: tonte_telegram_zone_isolee
+    alias: "🌿 TG - Zone isolée"
+    trigger:
+      - platform: state
+        entity_id: event.ha_maison_update_event
+    condition:
+      - condition: state
+        entity_id: event.ha_maison_update_event
+        attribute: event_type
+        state: telegram_callback
+      - condition: template
+        value_template: "{{ trigger.to_state.attributes.data == '/tonte_zone_isolee' }}"
+    action:
+      - service: input_boolean.turn_on
+        target:
+          entity_id: input_boolean.tonte_mode_zone_isolee
+      - service: input_boolean.turn_on
+        target:
+          entity_id: input_boolean.tonte_zone_confirmee
+      - service: telegram_bot.answer_callback_query
+        data:
+          callback_query_id: "{{ trigger.to_state.attributes.id }}"
+          message: "🏠 {{ states('input_text.tonte_zone_isolee_nom') }} !"
+        continue_on_error: true
+      - service: telegram_bot.send_message
+        data:
+          parse_mode: html
+          message: >-
+            🏠 <b>Tonte {{ states('input_text.tonte_zone_isolee_nom') }} en cours</b>
+            🔋 {{ states('sensor.navimow_VOTRE_MODELE_batterie') | int(0) }}%
+
+  - id: tonte_telegram_zone_ignorer
+    alias: "🌿 TG - Ignorer (ne pas compter)"
+    trigger:
+      - platform: state
+        entity_id: event.ha_maison_update_event
+    condition:
+      - condition: state
+        entity_id: event.ha_maison_update_event
+        attribute: event_type
+        state: telegram_callback
+      - condition: template
+        value_template: "{{ trigger.to_state.attributes.data == '/tonte_zone_ignorer' }}"
+    action:
+      - service: input_boolean.turn_on
+        target:
+          entity_id: input_boolean.tonte_zone_confirmee
+      - service: input_boolean.turn_on
+        target:
+          entity_id: input_boolean.tonte_session_ignoree
+      - service: telegram_bot.answer_callback_query
+        data:
+          callback_query_id: "{{ trigger.to_state.attributes.id }}"
+          message: "❌ Ignorée !"
+        continue_on_error: true
+      - service: telegram_bot.send_message
+        data:
+          parse_mode: html
+          message: "❌ C'est noté ! Cette tonte ne sera pas comptabilisée."
+
+  # ═══ CALLBACKS MOBILE ═══
+
+  - id: tonte_mobile_lancer
+    alias: "🌿 Mob - Lancer"
+    trigger:
+      - platform: event
+        event_type: mobile_app_notification_action
+        event_data:
+          action: "TONTE_LANCER"
+    action:
+      - service: script.tonte_lancer
+      - service: notify.mobile_app_pixel_9a
+        data:
+          title: "🚀 Lancé !"
+          message: "Batterie : {{ states('sensor.navimow_VOTRE_MODELE_batterie') | int(0) }}%"
+          data:
+            tag: "tonte_du_jour"
+
+  - id: tonte_mobile_reporter
+    alias: "🌿 Mob - Reporter"
+    trigger:
+      - platform: event
+        event_type: mobile_app_notification_action
+        event_data:
+          action: "TONTE_REPORTEE_MANUELLEMENT"
+    action:
+      - service: input_boolean.turn_on
+        target:
+          entity_id: input_boolean.tonte_reportee_aujourdhui
+      - service: notify.mobile_app_pixel_9a
+        data:
+          title: "⏭️ Reporté"
+          message: "Reproposé demain."
+          data:
+            tag: "tonte_du_jour"
+
+  - id: tonte_mobile_retour_base
+    alias: "🌿 Mob - Base"
+    trigger:
+      - platform: event
+        event_type: mobile_app_notification_action
+        event_data:
+          action: "TONTE_RETOUR_BASE"
+    action:
+      - service: script.tonte_retour_base
+
+  - id: tonte_mobile_effectuee
+    alias: "🌿 Mob - Effectuée"
+    trigger:
+      - platform: event
+        event_type: mobile_app_notification_action
+        event_data:
+          action: "TONTE_CONFIRMEE"
+    action:
+      - service: script.tonte_marquer_effectuee
+
+  # ═══ ALERTES ═══
+
+  - id: tonte_alerte_erreur
+    alias: "🌿 Alerte erreur"
+    trigger:
+      - platform: state
+        entity_id: lawn_mower.navimow_VOTRE_MODELE
+        to: "error"
+    action:
+      - choose:
+          - conditions:
+              - condition: state
+                entity_id: input_select.tonte_mode_notification
+                state: "telegram"
+            sequence:
+              - service: telegram_bot.send_message
+                data:
+                  parse_mode: html
+                  message: "🚨 <b>Erreur Navimow !</b> 🔋 {{ states('sensor.navimow_VOTRE_MODELE_batterie') | int(0) }}%"
+                  inline_keyboard:
+                    - "🏠 Retour base:/tonte_retour_base"
+          - conditions:
+              - condition: state
+                entity_id: input_select.tonte_mode_notification
+                state: "mobile"
+            sequence:
+              - service: notify.mobile_app_pixel_9a
+                data:
+                  title: "🚨 Erreur Navimow !"
+                  message: "Batterie : {{ states('sensor.navimow_VOTRE_MODELE_batterie') | int(0) }}%"
+                  data:
+                    actions:
+                      - action: "TONTE_RETOUR_BASE"
+                        title: "🏠 Retour base"
+                    tag: "tonte_erreur"
+                    importance: high
+                    channel: "Tonte"
+
+  - id: tonte_alerte_batterie
+    alias: "🌿 Alerte batterie"
+    trigger:
+      - platform: template
+        value_template: "{{ states('sensor.navimow_VOTRE_MODELE_batterie') | int(100) < states('input_number.tonte_seuil_batterie') | int(10) }}"
+    condition:
+      - condition: not
+        conditions:
+          - condition: state
+            entity_id: lawn_mower.navimow_VOTRE_MODELE
+            state: "docked"
+    action:
+      - choose:
+          - conditions:
+              - condition: state
+                entity_id: input_select.tonte_mode_notification
+                state: "telegram"
+            sequence:
+              - service: telegram_bot.send_message
+                data:
+                  parse_mode: html
+                  message: "🔋 <b>Batterie faible !</b> {{ states('sensor.navimow_VOTRE_MODELE_batterie') }}%"
+                  inline_keyboard:
+                    - "🏠 Retour base:/tonte_retour_base"
+          - conditions:
+              - condition: state
+                entity_id: input_select.tonte_mode_notification
+                state: "mobile"
+            sequence:
+              - service: notify.mobile_app_pixel_9a
+                data:
+                  title: "🔋 Batterie faible !"
+                  message: "{{ states('sensor.navimow_VOTRE_MODELE_batterie') }}%"
+                  data:
+                    actions:
+                      - action: "TONTE_RETOUR_BASE"
+                        title: "🏠 Retour base"
+                    tag: "tonte_batterie"
+                    importance: high
+                    channel: "Tonte"
+
+  - id: tonte_rappel_retard
+    alias: "🌿 Rappel retard"
+    trigger:
+      - platform: time
+        at: "12:00:00"
+    condition:
+      - condition: state
+        entity_id: input_boolean.tonte_mode_vacances
+        state: "off"
+      - condition: template
+        value_template: "{{ states('input_select.tonte_mode_notification') != 'aucune' }}"
+      - condition: template
+        value_template: >
+          {% set j = states('sensor.tonte_jours_ecoules') | int(0) %}
+          {% set i = state_attr('sensor.tonte_profil_saisonnier', 'intervalle_jours') | int(5) %}
+          {% set mult = states('input_number.tonte_retard_multiplicateur') | float(2) %}
+          {{ i > 0 and j >= (i * mult) | int }}
+    action:
+      - choose:
+          - conditions:
+              - condition: state
+                entity_id: input_select.tonte_mode_notification
+                state: "telegram"
+            sequence:
+              - service: telegram_bot.send_message
+                data:
+                  parse_mode: html
+                  message: "⚠️ <b>Pelouse en retard !</b> Dernière il y a {{ states('sensor.tonte_jours_ecoules') }}j · 🔋 {{ states('sensor.navimow_VOTRE_MODELE_batterie') | int(0) }}%"
+                  inline_keyboard:
+                    - "🚀 Lancer:/tonte_lancer, ✅ Déjà fait:/tonte_effectuee"
+          - conditions:
+              - condition: state
+                entity_id: input_select.tonte_mode_notification
+                state: "mobile"
+            sequence:
+              - service: notify.mobile_app_pixel_9a
+                data:
+                  title: "⚠️ Pelouse en retard !"
+                  message: "Dernière il y a {{ states('sensor.tonte_jours_ecoules') }}j · Batterie : {{ states('sensor.navimow_VOTRE_MODELE_batterie') | int(0) }}%"
+                  data:
+                    actions:
+                      - action: "TONTE_LANCER"
+                        title: "🚀 Lancer"
+                      - action: "TONTE_CONFIRMEE"
+                        title: "✅ Déjà fait"
+                    tag: "tonte_retard"
+                    importance: high
+                    channel: "Tonte"
+
+  - id: tonte_changement_saison
+    alias: "🌿 Changement saison"
+    trigger:
+      - platform: state
+        entity_id: sensor.tonte_profil_saisonnier
+    condition:
+      - condition: template
+        value_template: "{{ trigger.from_state.state != trigger.to_state.state and trigger.from_state.state not in ['unknown','unavailable'] }}"
+    action:
+      - choose:
+          - conditions:
+              - condition: template
+                value_template: "{{ trigger.from_state.state == 'hivernage' and trigger.to_state.state != 'hivernage' }}"
+            sequence:
+              - service: counter.reset
+                target:
+                  entity_id: counter.tonte_compteur_saison
+              - service: counter.reset
+                target:
+                  entity_id: counter.tonte_compteur_zone_isolee
+      - condition: state
+        entity_id: input_boolean.tonte_mode_vacances
+        state: "off"
+      - choose:
+          - conditions:
+              - condition: state
+                entity_id: input_select.tonte_mode_notification
+                state: "telegram"
+            sequence:
+              - service: telegram_bot.send_message
+                data:
+                  parse_mode: html
+                  message: "🗓️ <b>Nouveau profil :</b> {{ state_attr('sensor.tonte_profil_saisonnier', 'description_mois') }}"
+          - conditions:
+              - condition: state
+                entity_id: input_select.tonte_mode_notification
+                state: "mobile"
+            sequence:
+              - service: notify.mobile_app_pixel_9a
+                data:
+                  title: "🗓️ Nouveau profil"
+                  message: "{{ state_attr('sensor.tonte_profil_saisonnier', 'description_mois') }}"
+                  data:
+                    tag: "tonte_saison"
+                    channel: "Tonte"
+
+  - id: tonte_resume_hebdo
+    alias: "🌿 Résumé hebdo"
+    trigger:
+      - platform: time
+        at: "20:00:00"
+    condition:
+      - condition: time
+        weekday:
+          - sun
+      - condition: template
+        value_template: "{{ state_attr('sensor.tonte_profil_saisonnier', 'intervalle_jours') | int(0) > 0 }}"
+      - condition: state
+        entity_id: input_boolean.tonte_mode_vacances
+        state: "off"
+      - condition: template
+        value_template: "{{ states('input_select.tonte_mode_notification') != 'aucune' }}"
+    action:
+      - choose:
+          - conditions:
+              - condition: state
+                entity_id: input_select.tonte_mode_notification
+                state: "telegram"
+            sequence:
+              - service: telegram_bot.send_message
+                data:
+                  parse_mode: html
+                  message: >-
+                    🌿 <b>Résumé de la semaine</b>
+
+                    📊 {{ states('sensor.tonte_profil_saisonnier') | replace('_',' ') | title }}
+                    🔢 Jardin : {{ states('counter.tonte_compteur_saison') }} · {{ states('input_text.tonte_zone_isolee_nom') }} : {{ states('counter.tonte_compteur_zone_isolee') }}
+                    📅 Dernière : il y a {{ states('sensor.tonte_jours_ecoules') }}j
+                    📏 Hauteur : {{ state_attr('sensor.tonte_decision_du_jour', 'hauteur_recommandee') | float(4) }} cm
+                    🔋 {{ states('sensor.navimow_VOTRE_MODELE_batterie') | int(0) }}%
+                    ➡️ Prochaine : {{ state_attr('sensor.tonte_decision_du_jour', 'prochaine_tonte_estimee') | default('—') }}
+          - conditions:
+              - condition: state
+                entity_id: input_select.tonte_mode_notification
+                state: "mobile"
+            sequence:
+              - service: notify.mobile_app_pixel_9a
+                data:
+                  title: "🌿 Résumé de la semaine"
+                  message: "Jardin : {{ states('counter.tonte_compteur_saison') }} · {{ states('input_text.tonte_zone_isolee_nom') }} : {{ states('counter.tonte_compteur_zone_isolee') }} · Prochaine : {{ state_attr('sensor.tonte_decision_du_jour', 'prochaine_tonte_estimee') | default('—') }}"
+                  data:
+                    tag: "tonte_recap"
+                    channel: "Tonte"
+
+  # ═══ RESET REPORT QUOTIDIEN À MINUIT ═══
+
+  - id: tonte_reset_report_minuit
+    alias: "🌿 Reset report à minuit"
+    trigger:
+      - platform: time
+        at: "00:00:00"
+    action:
+      - service: input_boolean.turn_off
+        target:
+          entity_id: input_boolean.tonte_reportee_aujourdhui
+
+  # ═══ SÉCURITÉ : RESET SESSION BLOQUÉE ═══
+
+  - id: tonte_reset_session_bloquee
+    alias: "🌿 Reset session bloquée"
+    description: >
+      Sécurité : si tonte_session_active est ON mais que la tondeuse
+      est sur sa base depuis plus de 3h et que le timer est inactif,
+      on reset automatiquement la session pour éviter un statut
+      "en cours" bloqué indéfiniment.
+    trigger:
+      - platform: state
+        entity_id: lawn_mower.navimow_VOTRE_MODELE
+        to: "docked"
+        for:
+          hours: 3
+    condition:
+      - condition: state
+        entity_id: input_boolean.tonte_session_active
+        state: "on"
+      - condition: not
+        conditions:
+          - condition: state
+            entity_id: timer.tonte_fin_detection
+            state: "active"
+    action:
+      - service: input_boolean.turn_off
+        target:
+          entity_id: input_boolean.tonte_session_active
+      - service: input_boolean.turn_off
+        target:
+          entity_id: input_boolean.tonte_mode_zone_isolee
+      - service: input_boolean.turn_off
+        target:
+          entity_id: input_boolean.tonte_zone_confirmee
+      - service: input_boolean.turn_off
+        target:
+          entity_id: input_boolean.tonte_session_ignoree
+      - service: timer.cancel
+        target:
+          entity_id: timer.tonte_fin_detection
+
+  # ═══ MODE FULL AUTONOME ═══
+
+  - id: tonte_demarrage_auto
+    alias: "🤖 Démarrage automatique"
+    description: >
+      En mode full autonome, démarre la tondeuse automatiquement
+      si toutes les conditions sont réunies à l'heure de notification.
+      Vérifie : jour de tonte, météo favorable, plage horaire,
+      jour non exclu, pas en vacances, batterie suffisante.
+    trigger:
+      - platform: time
+        at: input_datetime.tonte_heure_notification
+    condition:
+      # Mode auto activé
+      - condition: state
+        entity_id: input_boolean.tonte_mode_auto
+        state: "on"
+      # Pas en vacances
+      - condition: state
+        entity_id: input_boolean.tonte_mode_vacances
+        state: "off"
+      # Pas déjà en session
+      - condition: state
+        entity_id: input_boolean.tonte_session_active
+        state: "off"
+      # Jour de tonte prévu
+      - condition: state
+        entity_id: sensor.tonte_decision_du_jour
+        state: "tondre"
+      # Dans la plage horaire
+      - condition: template
+        value_template: >
+          {% set now_t = now().strftime('%H:%M') %}
+          {% set debut = states('input_datetime.tonte_auto_heure_debut')[0:5] %}
+          {% set fin = states('input_datetime.tonte_auto_heure_fin')[0:5] %}
+          {{ debut <= now_t <= fin }}
+      # Jour non exclu
+      - condition: template
+        value_template: >
+          {% set jours = {'lundi':0,'mardi':1,'mercredi':2,'jeudi':3,'vendredi':4,'samedi':5,'dimanche':6} %}
+          {% set exclu = states('input_select.tonte_auto_jour_exclusion') %}
+          {% if exclu == 'aucun' %}true
+          {% else %}{{ now().weekday() != jours.get(exclu, -1) }}{% endif %}
+    action:
+      # Lancer la tondeuse
+      - service: lawn_mower.start_mowing
+        target:
+          entity_id: lawn_mower.navimow_VOTRE_MODELE
+      # Activer le watchdog
+      - service: input_boolean.turn_on
+        target:
+          entity_id: input_boolean.tonte_auto_watchdog_actif
+      # Notification silencieuse de démarrage
+      - condition: template
+        value_template: "{{ states('input_select.tonte_mode_notification') != 'aucune' }}"
+      - condition: state
+        entity_id: input_boolean.tonte_mode_vacances
+        state: "off"
+      - choose:
+          - conditions:
+              - condition: state
+                entity_id: input_select.tonte_mode_notification
+                state: "telegram"
+            sequence:
+              - service: telegram_bot.send_message
+                data:
+                  parse_mode: html
+                  message: >-
+                    🤖 <b>Tonte démarrée automatiquement</b>
+
+                    🔋 Batterie : {{ states('sensor.navimow_VOTRE_MODELE_batterie') | int(0) }}%
+                    📏 Hauteur conseillée : {{ state_attr('sensor.tonte_decision_du_jour', 'hauteur_recommandee') | float(4) }} cm
+                    🔢 Ce sera la tonte n°{{ states('counter.tonte_compteur_saison') | int(0) + 1 }}
+                    ➡️ Aucune action requise.
+                  inline_keyboard:
+                    - - "⏹️ Arrêter:/tonte_retour_base"
+          - conditions:
+              - condition: state
+                entity_id: input_select.tonte_mode_notification
+                state: "mobile"
+            sequence:
+              - service: notify.mobile_app_pixel_9a
+                data:
+                  title: "🤖 Tonte démarrée automatiquement"
+                  message: "Batterie : {{ states('sensor.navimow_VOTRE_MODELE_batterie') | int(0) }}% · Tonte n°{{ states('counter.tonte_compteur_saison') | int(0) + 1 }}"
+                  data:
+                    actions:
+                      - action: "TONTE_RETOUR_BASE"
+                        title: "⏹️ Arrêter"
+                    tag: "tonte_du_jour"
+                    channel: "Tonte"
+
+  - id: tonte_auto_watchdog_ok
+    alias: "🤖 Watchdog démarrage auto - OK"
+    description: >
+      Désactive le watchdog quand la tondeuse passe bien en mowing
+      après un démarrage automatique.
+    trigger:
+      - platform: state
+        entity_id: lawn_mower.navimow_VOTRE_MODELE
+        to: "mowing"
+    condition:
+      - condition: state
+        entity_id: input_boolean.tonte_auto_watchdog_actif
+        state: "on"
+    action:
+      - service: input_boolean.turn_off
+        target:
+          entity_id: input_boolean.tonte_auto_watchdog_actif
+
+  - id: tonte_auto_watchdog_alerte
+    alias: "🤖 Watchdog démarrage auto - Alerte"
+    description: >
+      Si la tondeuse n'est pas passée en mowing dans les 10 minutes
+      après un démarrage automatique, envoie une alerte.
+    trigger:
+      - platform: state
+        entity_id: input_boolean.tonte_auto_watchdog_actif
+        to: "on"
+        for:
+          minutes: 10
+    condition:
+      - condition: state
+        entity_id: input_boolean.tonte_auto_watchdog_actif
+        state: "on"
+      # Confirmer que la tondeuse n'est pas en mowing
+      - condition: not
+        conditions:
+          - condition: state
+            entity_id: lawn_mower.navimow_VOTRE_MODELE
+            state: "mowing"
+    action:
+      - service: input_boolean.turn_off
+        target:
+          entity_id: input_boolean.tonte_auto_watchdog_actif
+      - choose:
+          - conditions:
+              - condition: state
+                entity_id: input_select.tonte_mode_notification
+                state: "telegram"
+            sequence:
+              - service: telegram_bot.send_message
+                data:
+                  parse_mode: html
+                  message: >-
+                    ⚠️ <b>Démarrage auto échoué !</b>
+
+                    La tondeuse n'a pas démarré après 10 minutes.
+                    État actuel : {{ states('sensor.navimow_etat_fr') }}
+                    🔋 {{ states('sensor.navimow_VOTRE_MODELE_batterie') | int(0) }}%
+
+                    Vérifiez l'état de la tondeuse.
+                  inline_keyboard:
+                    - - "🚀 Réessayer:/tonte_lancer"
+                      - "🏠 Base:/tonte_retour_base"
+          - conditions:
+              - condition: state
+                entity_id: input_select.tonte_mode_notification
+                state: "mobile"
+            sequence:
+              - service: notify.mobile_app_pixel_9a
+                data:
+                  title: "⚠️ Démarrage auto échoué !"
+                  message: "La tondeuse n'a pas démarré. État : {{ states('sensor.navimow_etat_fr') }}"
+                  data:
+                    actions:
+                      - action: "TONTE_LANCER"
+                        title: "🚀 Réessayer"
+                      - action: "TONTE_RETOUR_BASE"
+                        title: "🏠 Base"
+                    tag: "tonte_auto_echec"
+                    importance: high
+                    channel: "Tonte"

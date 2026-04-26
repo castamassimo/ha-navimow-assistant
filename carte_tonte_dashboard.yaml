@@ -1,0 +1,539 @@
+# 🌿 CARTE DASHBOARD v8
+
+type: vertical-stack
+cards:
+
+  - type: custom:mushroom-title-card
+    title: Tondeuse Navimow
+    subtitle: >
+      {{ state_attr('sensor.tonte_profil_saisonnier', 'description_mois') }}
+    title_tap_action:
+      action: none
+    subtitle_tap_action:
+      action: none
+    card_mod:
+      style: |
+        ha-card { text-align: center; margin-bottom: -8px !important; }
+
+  - type: custom:mushroom-chips-card
+    chips:
+      - type: template
+        icon: >
+          {% set d = states('sensor.tonte_decision_du_jour') %}
+          {% if d == 'tondre' %}mdi:robot-mower{% elif d == 'en_cours' %}mdi:robot-mower{% elif d == 'effectuee' %}mdi:check-circle{% elif d == 'reporte_pluie' %}mdi:weather-pouring{% elif d == 'reporte_manuel' %}mdi:calendar-arrow-right{% elif d == 'hivernage' %}mdi:snowflake{% else %}mdi:pause-circle-outline{% endif %}
+        icon_color: >
+          {% set d = states('sensor.tonte_decision_du_jour') %}
+          {% if d == 'tondre' %}green{% elif d == 'en_cours' %}amber{% elif d == 'effectuee' %}teal{% elif d == 'reporte_pluie' %}orange{% elif d == 'reporte_manuel' %}orange{% elif d == 'hivernage' %}blue{% else %}grey{% endif %}
+        content: >
+          {% set d = states('sensor.tonte_decision_du_jour') %}
+          {% if d == 'tondre' %}Jour de tonte{% elif d == 'en_cours' %}Tonte en cours{% elif d == 'effectuee' %}Tondu{% elif d == 'reporte_pluie' %}Reporté pluie{% elif d == 'reporte_manuel' %}Reporté{% elif d == 'hivernage' %}Hivernage{% else %}Pas prévu{% endif %}
+      - type: template
+        icon: "{% if is_state('sensor.tonte_meteo_favorable', 'oui') %}mdi:weather-sunny{% else %}mdi:weather-rainy{% endif %}"
+        icon_color: "{{ 'green' if is_state('sensor.tonte_meteo_favorable', 'oui') else 'red' }}"
+        content: "Pluie {{ state_attr('sensor.tonte_meteo_favorable', 'rain_chance') }}"
+      - type: template
+        icon: mdi:thermometer
+        icon_color: amber
+        content: "{{ state_attr('sensor.tonte_meteo_favorable', 'temperature') }}"
+      - type: template
+        icon: >
+          {% set bat = states('sensor.navimow_VOTRE_MODELE_batterie') | int(0) %}
+          {% if is_state('lawn_mower.navimow_VOTRE_MODELE', 'docked') %}mdi:battery-charging{% elif bat > 75 %}mdi:battery-high{% elif bat > 30 %}mdi:battery-medium{% else %}mdi:battery-low{% endif %}
+        icon_color: "{% set bat = states('sensor.navimow_VOTRE_MODELE_batterie') | int(0) %}{% if bat > 50 %}green{% elif bat > 20 %}amber{% else %}red{% endif %}"
+        content: "{{ states('sensor.navimow_VOTRE_MODELE_batterie') | int(0) }}%"
+      - type: conditional
+        conditions:
+          - entity: input_boolean.tonte_mode_zone_isolee
+            state: "on"
+        chip:
+          type: template
+          icon: mdi:floor-plan
+          icon_color: deep-purple
+          content: "{{ states('input_text.tonte_zone_isolee_nom') }}"
+      - type: conditional
+        conditions:
+          - entity: input_boolean.tonte_mode_auto
+            state: "on"
+        chip:
+          type: template
+          icon: mdi:robot-mower
+          icon_color: green
+          content: "🤖 Auto"
+      - type: conditional
+        conditions:
+          - entity: input_boolean.tonte_mode_vacances
+            state: "on"
+        chip:
+          type: template
+          icon: mdi:palm-tree
+          icon_color: amber
+          content: Vacances
+
+  - type: custom:mushroom-template-card
+    primary: >
+      {% set d = states('sensor.tonte_decision_du_jour') %}
+      {% if d == 'en_cours' %}Tonte en cours... 🔄
+      {% elif d == 'effectuee' %}Tonte effectuée aujourd'hui ✅
+      {% elif d == 'tondre' %}C'est jour de tonte ! 🌿
+      {% elif d == 'reporte_pluie' %}Tonte reportée — Pluie 🌧️
+      {% elif d == 'reporte_manuel' %}Tonte reportée 🌧️
+      {% elif d == 'hivernage' %}Hivernage ❄️
+      {% else %}Pas de tonte prévue{% endif %}
+    secondary: >
+      {% set d = states('sensor.tonte_decision_du_jour') %}
+      {% set h = state_attr('sensor.tonte_decision_du_jour', 'hauteur_recommandee') | float(4) %}
+      {% set bat = states('sensor.navimow_VOTRE_MODELE_batterie') | int(0) %}
+      {% set dm = state_attr('sensor.tonte_meteo_favorable', 'meteo_demain') | default('inconnu') %}
+      {% set auto = is_state('input_boolean.tonte_mode_auto', 'on') %}
+      {% set prochaine = state_attr('sensor.tonte_decision_du_jour', 'prochaine_tonte_estimee') | default('—') %}
+      {% if d == 'en_cours' %}{{ states('sensor.navimow_etat_fr') }} · 🔋 {{ bat }}%
+      {% elif d == 'effectuee' %}{% if auto %}🤖 Prochaine auto : {{ prochaine }}{% else %}Prochaine : {{ prochaine }}{% endif %}
+      {% elif d == 'tondre' %}{% if auto %}🤖 Démarrage auto prévu aujourd'hui · 🔋 {{ bat }}%{% else %}Hauteur conseillée : {{ h }} cm · 🔋 {{ bat }}%{% endif %}
+      {% elif d == 'reporte_pluie' %}{{ state_attr('sensor.tonte_meteo_favorable', 'rain_chance') }}{% if dm == 'favorable' %} · Demain OK{% elif dm == 'défavorable' %} · Pluie aussi demain{% endif %}{% if auto %} · 🤖 Auto en attente{% endif %}
+      {% elif d == 'reporte_manuel' %}Reproposé demain ou au prochain rappel
+      {% elif d == 'hivernage' %}Reprise au printemps
+      {% else %}{% if auto %}🤖 Mode auto · Prochaine : {{ prochaine }}{% else %}Prochaine : {{ prochaine }}{% endif %}{% endif %}
+    icon: >
+      {% set d = states('sensor.tonte_decision_du_jour') %}
+      {% if d == 'en_cours' %}mdi:robot-mower{% elif d == 'effectuee' %}mdi:check-circle{% elif d == 'tondre' %}mdi:robot-mower{% elif d == 'reporte_pluie' %}mdi:weather-pouring{% elif d == 'reporte_manuel' %}mdi:calendar-arrow-right{% elif d == 'hivernage' %}mdi:snowflake{% else %}mdi:robot-mower-outline{% endif %}
+    icon_color: >
+      {% set d = states('sensor.tonte_decision_du_jour') %}
+      {% if d == 'en_cours' %}amber{% elif d == 'effectuee' %}teal{% elif d == 'tondre' %}green{% elif d == 'reporte_pluie' %}orange{% elif d == 'reporte_manuel' %}orange{% elif d == 'hivernage' %}blue{% else %}disabled{% endif %}
+    fill_container: true
+    multiline_secondary: true
+    card_mod:
+      style: |
+        ha-card { text-align: center; }
+        mushroom-shape-icon { display: flex; justify-content: center; }
+
+  - type: conditional
+    conditions:
+      - condition: state
+        entity: sensor.tonte_profil_saisonnier
+        state_not: "hivernage"
+    card:
+      type: horizontal-stack
+      cards:
+        - type: custom:mushroom-template-card
+          primary: Lancer
+          icon: mdi:play
+          icon_color: "{% set s = states('lawn_mower.navimow_VOTRE_MODELE') %}{{ 'green' if s in ['docked','paused'] else 'disabled' }}"
+          layout: vertical
+          tap_action:
+            action: perform-action
+            perform_action: script.tonte_lancer
+            confirmation:
+              text: "Lancer ?"
+        - type: custom:mushroom-template-card
+          primary: Pause
+          icon: mdi:pause
+          icon_color: "{{ 'amber' if is_state('lawn_mower.navimow_VOTRE_MODELE', 'mowing') else 'disabled' }}"
+          layout: vertical
+          tap_action:
+            action: perform-action
+            perform_action: script.tonte_pause
+            confirmation:
+              text: "Pause ?"
+        - type: custom:mushroom-template-card
+          primary: Base
+          icon: mdi:home-import-outline
+          icon_color: "{% set s = states('lawn_mower.navimow_VOTRE_MODELE') %}{{ 'blue' if s in ['mowing','paused'] else 'disabled' }}"
+          layout: vertical
+          tap_action:
+            action: perform-action
+            perform_action: script.tonte_retour_base
+            confirmation:
+              text: "Base ?"
+
+  - type: horizontal-stack
+    cards:
+      - type: custom:mushroom-template-card
+        primary: "{{ state_attr('sensor.tonte_decision_du_jour', 'hauteur_recommandee') | float(4) }} cm"
+        secondary: Hauteur conseillée
+        icon: mdi:ruler
+        icon_color: teal
+        layout: vertical
+      - type: custom:mushroom-template-card
+        primary: >
+          {% set j = states('sensor.tonte_jours_ecoules') | int(0) %}
+          {% if j == 0 %}Aujourd'hui{% elif j == 1 %}Hier{% else %}{{ j }} jours{% endif %}
+        secondary: Dernière tonte
+        icon: mdi:calendar-clock
+        icon_color: >
+          {% set j = states('sensor.tonte_jours_ecoules') | int(0) %}
+          {% set i = state_attr('sensor.tonte_profil_saisonnier', 'intervalle_jours') | int(5) %}
+          {% if j >= i * 2 %}red{% elif j >= i %}orange{% else %}green{% endif %}
+        layout: vertical
+
+  - type: horizontal-stack
+    cards:
+      - type: custom:mushroom-template-card
+        primary: "{{ state_attr('sensor.tonte_profil_saisonnier', 'frequence_par_semaine') }}x / sem"
+        secondary: Fréquence cible
+        icon: mdi:calendar-week
+        icon_color: deep-purple
+        layout: vertical
+      - type: custom:mushroom-template-card
+        primary: "{{ state_attr('sensor.tonte_decision_du_jour', 'prochaine_tonte_estimee') | default('—') }}"
+        secondary: Prochaine tonte
+        icon: mdi:calendar-arrow-right
+        icon_color: cyan
+        layout: vertical
+
+  - type: horizontal-stack
+    cards:
+      - type: custom:mushroom-template-card
+        primary: "{{ states('counter.tonte_compteur_saison') | int(0) }}"
+        secondary: Jardin
+        icon: mdi:counter
+        icon_color: green
+        layout: vertical
+      - type: custom:mushroom-template-card
+        primary: "{{ states('counter.tonte_compteur_zone_isolee') | int(0) }}"
+        secondary: "{{ states('input_text.tonte_zone_isolee_nom') }}"
+        icon: mdi:floor-plan
+        icon_color: deep-purple
+        layout: vertical
+      - type: custom:mushroom-template-card
+        primary: >
+          {% set m = now().month %}
+          {% set mois = {1:'Jan',2:'Fév',3:'Mars',4:'Avr',5:'Mai',6:'Juin',7:'Juil',8:'Août',9:'Sept',10:'Oct',11:'Nov',12:'Déc'} %}
+          {{ mois[m] }}
+        secondary: "{{ now().day }}/{{ ((now().replace(month=now().month%12+1,day=1)-timedelta(days=1)).day if now().month!=12 else 31) }}"
+        icon: "{% set m = now().month %}{% if m in [12,1,2] %}mdi:snowflake{% elif m in [3,4,5] %}mdi:flower{% elif m in [6,7,8] %}mdi:white-balance-sunny{% else %}mdi:leaf-maple{% endif %}"
+        icon_color: "{% set m = now().month %}{% if m in [12,1,2] %}blue{% elif m in [3,4,5] %}green{% elif m in [6,7,8] %}amber{% else %}orange{% endif %}"
+        layout: vertical
+        card_mod:
+          style: |
+            ha-card { overflow: hidden; }
+            ha-card::after {
+              content: '';
+              position: absolute; bottom: 0; left: 0;
+              height: 3px; border-radius: 0 2px 2px 0;
+              {% set m = now().month %}
+              {% set d = (now().replace(month=m%12+1,day=1)-timedelta(days=1)).day if m!=12 else 31 %}
+              width: {{ (now().day / d * 100)|round(0) }}%;
+              background: {% if m in [12,1,2] %}var(--info-color){% elif m in [3,4,5] %}var(--success-color){% else %}var(--warning-color){% endif %};
+            }
+
+  # ━━━ RÉGLAGES (repliable) ━━━
+  - type: custom:mushroom-template-card
+    primary: Réglages
+    icon: "{% if is_state('input_boolean.tonte_afficher_reglages', 'on') %}mdi:chevron-up{% else %}mdi:chevron-down{% endif %}"
+    icon_color: grey
+    tap_action:
+      action: perform-action
+      perform_action: input_boolean.toggle
+      target:
+        entity_id: input_boolean.tonte_afficher_reglages
+    card_mod:
+      style: |
+        ha-card { text-align: center; --card-primary-font-size: 13px; opacity: 0.7; }
+
+  - type: conditional
+    conditions:
+      - entity: input_boolean.tonte_afficher_reglages
+        state: "on"
+    card:
+      type: vertical-stack
+      cards:
+        - type: custom:mushroom-template-card
+          primary: Marquer tonte jardin
+          icon: mdi:check-circle-outline
+          icon_color: green
+          tap_action:
+            action: perform-action
+            perform_action: script.tonte_marquer_effectuee
+            confirmation:
+              text: "Confirmer tonte jardin ?"
+          card_mod:
+            style: |
+              ha-card { text-align: center; }
+        - type: conditional
+          conditions:
+            - entity: input_boolean.tonte_session_active
+              state: "on"
+          card:
+            type: custom:mushroom-template-card
+            primary: Reset session bloquée
+            secondary: >
+              Statut "en cours" bloqué ? Appui long pour forcer le reset.
+            icon: mdi:refresh-circle
+            icon_color: red
+            multiline_secondary: true
+            hold_action:
+              action: call-service
+              service: homeassistant.turn_off
+              service_data:
+                entity_id:
+                  - input_boolean.tonte_session_active
+                  - input_boolean.tonte_mode_zone_isolee
+                  - input_boolean.tonte_zone_confirmee
+                  - input_boolean.tonte_session_ignoree
+              confirmation:
+                text: "Forcer le reset de la session en cours ?"
+            tap_action:
+              action: none
+            card_mod:
+              style: |
+                ha-card { text-align: center; border-left: 3px solid rgba(244,67,54,0.5); }
+        - type: custom:mushroom-entity-card
+          entity: input_boolean.tonte_mode_zone_isolee
+          name: "Mode {{ states('input_text.tonte_zone_isolee_nom') }}"
+          icon: mdi:floor-plan
+          icon_color: deep-purple
+        - type: custom:mushroom-entity-card
+          entity: input_datetime.tonte_derniere_date
+          name: Dernière tonte jardin
+          icon: mdi:calendar-check
+          icon_color: teal
+        - type: custom:mushroom-entity-card
+          entity: input_datetime.tonte_heure_notification
+          name: Heure notification
+          icon: mdi:clock-outline
+          icon_color: deep-purple
+        - type: custom:mushroom-select-card
+          entity: input_select.tonte_mode_notification
+          name: Mode notification
+          icon: mdi:bell-outline
+          icon_color: deep-purple
+        - type: custom:mushroom-entity-card
+          entity: input_boolean.tonte_mode_vacances
+          name: Mode vacances
+          icon: mdi:palm-tree
+          icon_color: amber
+        - type: custom:mushroom-number-card
+          entity: input_number.tonte_seuil_pluie
+          name: Seuil pluie
+          icon: mdi:water-percent
+          icon_color: cyan
+        - type: custom:mushroom-number-card
+          entity: input_number.tonte_seuil_batterie
+          name: Seuil batterie
+          icon: mdi:battery-alert
+          icon_color: red
+        - type: custom:mushroom-number-card
+          entity: input_number.tonte_hauteur_override
+          name: "Override hauteur (0=auto)"
+          icon: mdi:ruler
+          icon_color: teal
+        # ── Séparateur Mode Auto ──────────────────────────────
+        - type: custom:mushroom-title-card
+          title: ""
+          subtitle: "▸ Mode full autonome"
+          card_mod:
+            style: |
+              ha-card { --subtitle-font-size: 12px; opacity: 0.6; }
+
+        # ── Toggle mode auto ──────────────────────────────────
+        - type: custom:mushroom-entity-card
+          entity: input_boolean.tonte_mode_auto
+          name: "Mode full autonome"
+          secondary_info: >
+            {% if is_state('input_boolean.tonte_mode_auto', 'on') %}
+              🤖 Actif — tonte automatique si conditions réunies
+            {% else %}
+              Manuel — notification de proposition le matin
+            {% endif %}
+          icon: mdi:robot-mower
+          icon_color: >
+            {% if is_state('input_boolean.tonte_mode_auto', 'on') %}green{% else %}grey{% endif %}
+
+        # ── Plage horaire (visible si mode auto ON) ───────────
+        - type: conditional
+          conditions:
+            - entity: input_boolean.tonte_mode_auto
+              state: "on"
+          card:
+            type: horizontal-stack
+            cards:
+              - type: custom:mushroom-entity-card
+                entity: input_datetime.tonte_auto_heure_debut
+                name: "Début"
+                icon: mdi:clock-start
+                icon_color: green
+              - type: custom:mushroom-entity-card
+                entity: input_datetime.tonte_auto_heure_fin
+                name: "Fin"
+                icon: mdi:clock-end
+                icon_color: orange
+
+        # ── Jour exclusion (visible si mode auto ON) ──────────
+        - type: conditional
+          conditions:
+            - entity: input_boolean.tonte_mode_auto
+              state: "on"
+          card:
+            type: custom:mushroom-select-card
+            entity: input_select.tonte_auto_jour_exclusion
+            name: "Jour exclu"
+            icon: mdi:calendar-remove
+            icon_color: red
+
+        # ── Séparateur ────────────────────────────────────────
+        - type: custom:mushroom-title-card
+          title: ""
+          subtitle: "▸ Autres réglages"
+          card_mod:
+            style: |
+              ha-card { --subtitle-font-size: 12px; opacity: 0.6; }
+
+        - type: custom:mushroom-entity-card
+          entity: input_boolean.tonte_hivernage_force
+          name: Hivernage forcé (appui long)
+          icon: mdi:snowflake
+          icon_color: blue
+          tap_action:
+            action: none
+          hold_action:
+            action: toggle
+            confirmation:
+              text: "Basculer hivernage forcé ?"
+
+  # ━━━ CONFIG SAISONNIÈRE (repliable) ━━━
+  - type: custom:mushroom-template-card
+    primary: Configuration saisonnière
+    icon: "{% if is_state('input_boolean.tonte_afficher_config_saison', 'on') %}mdi:chevron-up{% else %}mdi:chevron-down{% endif %}"
+    icon_color: grey
+    tap_action:
+      action: perform-action
+      perform_action: input_boolean.toggle
+      target:
+        entity_id: input_boolean.tonte_afficher_config_saison
+    card_mod:
+      style: |
+        ha-card { text-align: center; --card-primary-font-size: 13px; opacity: 0.7; }
+
+  - type: conditional
+    conditions:
+      - entity: input_boolean.tonte_afficher_config_saison
+        state: "on"
+    card:
+      type: vertical-stack
+      cards:
+        - type: custom:mushroom-title-card
+          title: ""
+          subtitle: "Intervalle (j) = jours entre tontes · 0 = hivernage"
+          card_mod:
+            style: |
+              ha-card { text-align: center; --subtitle-font-size: 12px; opacity: 0.7; }
+        - type: horizontal-stack
+          cards:
+            - type: custom:mushroom-number-card
+              entity: input_number.tonte_intervalle_01
+              name: "Jan"
+              icon: mdi:snowflake
+            - type: custom:mushroom-number-card
+              entity: input_number.tonte_hauteur_01
+              name: "Jan cm"
+              icon: mdi:ruler
+        - type: horizontal-stack
+          cards:
+            - type: custom:mushroom-number-card
+              entity: input_number.tonte_intervalle_02
+              name: "Fév"
+              icon: mdi:snowflake
+            - type: custom:mushroom-number-card
+              entity: input_number.tonte_hauteur_02
+              name: "Fév cm"
+              icon: mdi:ruler
+        - type: horizontal-stack
+          cards:
+            - type: custom:mushroom-number-card
+              entity: input_number.tonte_intervalle_03
+              name: "Mars"
+              icon: mdi:flower
+            - type: custom:mushroom-number-card
+              entity: input_number.tonte_hauteur_03
+              name: "Mars cm"
+              icon: mdi:ruler
+        - type: horizontal-stack
+          cards:
+            - type: custom:mushroom-number-card
+              entity: input_number.tonte_intervalle_04
+              name: "Avr"
+              icon: mdi:flower
+            - type: custom:mushroom-number-card
+              entity: input_number.tonte_hauteur_04
+              name: "Avr cm"
+              icon: mdi:ruler
+        - type: horizontal-stack
+          cards:
+            - type: custom:mushroom-number-card
+              entity: input_number.tonte_intervalle_05
+              name: "Mai"
+              icon: mdi:flower
+            - type: custom:mushroom-number-card
+              entity: input_number.tonte_hauteur_05
+              name: "Mai cm"
+              icon: mdi:ruler
+        - type: horizontal-stack
+          cards:
+            - type: custom:mushroom-number-card
+              entity: input_number.tonte_intervalle_06
+              name: "Juin"
+              icon: mdi:white-balance-sunny
+            - type: custom:mushroom-number-card
+              entity: input_number.tonte_hauteur_06
+              name: "Juin cm"
+              icon: mdi:ruler
+        - type: horizontal-stack
+          cards:
+            - type: custom:mushroom-number-card
+              entity: input_number.tonte_intervalle_07
+              name: "Juil"
+              icon: mdi:white-balance-sunny
+            - type: custom:mushroom-number-card
+              entity: input_number.tonte_hauteur_07
+              name: "Juil cm"
+              icon: mdi:ruler
+        - type: horizontal-stack
+          cards:
+            - type: custom:mushroom-number-card
+              entity: input_number.tonte_intervalle_08
+              name: "Août"
+              icon: mdi:white-balance-sunny
+            - type: custom:mushroom-number-card
+              entity: input_number.tonte_hauteur_08
+              name: "Août cm"
+              icon: mdi:ruler
+        - type: horizontal-stack
+          cards:
+            - type: custom:mushroom-number-card
+              entity: input_number.tonte_intervalle_09
+              name: "Sept"
+              icon: mdi:leaf
+            - type: custom:mushroom-number-card
+              entity: input_number.tonte_hauteur_09
+              name: "Sept cm"
+              icon: mdi:ruler
+        - type: horizontal-stack
+          cards:
+            - type: custom:mushroom-number-card
+              entity: input_number.tonte_intervalle_10
+              name: "Oct"
+              icon: mdi:leaf
+            - type: custom:mushroom-number-card
+              entity: input_number.tonte_hauteur_10
+              name: "Oct cm"
+              icon: mdi:ruler
+        - type: horizontal-stack
+          cards:
+            - type: custom:mushroom-number-card
+              entity: input_number.tonte_intervalle_11
+              name: "Nov"
+              icon: mdi:snowflake
+            - type: custom:mushroom-number-card
+              entity: input_number.tonte_hauteur_11
+              name: "Nov cm"
+              icon: mdi:ruler
+        - type: horizontal-stack
+          cards:
+            - type: custom:mushroom-number-card
+              entity: input_number.tonte_intervalle_12
+              name: "Déc"
+              icon: mdi:snowflake
+            - type: custom:mushroom-number-card
+              entity: input_number.tonte_hauteur_12
+              name: "Déc cm"
+              icon: mdi:ruler
