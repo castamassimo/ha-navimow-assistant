@@ -77,6 +77,13 @@ input_boolean:
     icon: mdi:calendar-check
     initial: true
 
+  # ── Mode full autonome ───────────────────────────────────
+  # Déclaré ici pour survivre aux redémarrages HA
+  tonte_mode_auto:
+    name: "Mode full autonome"
+    icon: mdi:robot-mower
+    initial: false
+
   # ── Afficher la carte d'installation ──────────────────────
   tonte_afficher_installation:
     name: "Afficher installation"
@@ -178,6 +185,14 @@ shell_command:
 
   tonte_persist_zone_nom: >
     sed -i '/tonte_zone_isolee_nom/{n;n;n;s|initial: ".*"|initial: "{{ states('input_text.tonte_zone_isolee_nom') | trim }}"|}'
+    /config/packages/tonte_setup.yaml
+
+  tonte_persist_mode_auto_on: >
+    sed -i '/tonte_mode_auto/{n;n;n;s|initial: .*|initial: true|}'
+    /config/packages/tonte_setup.yaml
+
+  tonte_persist_mode_auto_off: >
+    sed -i '/tonte_mode_auto/{n;n;n;s|initial: .*|initial: false|}'
     /config/packages/tonte_setup.yaml
 
   tonte_persist_calendrier_on: >
@@ -305,6 +320,15 @@ script:
         default:
           - service: shell_command.tonte_persist_zone_off
       - service: shell_command.tonte_persist_zone_nom
+      - choose:
+          - conditions:
+              - condition: state
+                entity_id: input_boolean.tonte_mode_auto
+                state: "on"
+            sequence:
+              - service: shell_command.tonte_persist_mode_auto_on
+        default:
+          - service: shell_command.tonte_persist_mode_auto_off
       - choose:
           - conditions:
               - condition: state
