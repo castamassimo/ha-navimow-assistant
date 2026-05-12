@@ -126,6 +126,14 @@ cards:
               icon: mdi:tag
               icon_color: deep-purple
 
+        # ── Mode full autonome ───────────────────────────────
+        - type: custom:mushroom-entity-card
+          entity: input_boolean.tonte_mode_auto
+          name: "Mode full autonome"
+          secondary_info: "La tondeuse démarre seule si conditions réunies"
+          icon: mdi:robot-mower
+          icon_color: green
+
         # ── Calendrier ────────────────────────────────────────
         - type: custom:mushroom-entity-card
           entity: input_boolean.tonte_cfg_calendrier
