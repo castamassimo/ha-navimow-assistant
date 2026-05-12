@@ -1,5 +1,20 @@
+[CHANGELOG.md](https://github.com/user-attachments/files/27631138/CHANGELOG.md)
 # 🌿 CHANGELOG — Assistant Intelligent de Tonte
 ## Navimow + Home Assistant
+
+---
+
+## v2.4.4 — Stabilisation détection fin de tonte & mode autonome
+*Mai 2026*
+
+### 🐛 Correctifs
+- **Fausses notifications de fin de tonte** : l'intégration NavimowHA remonte systématiquement `100%` dans les 30 secondes après chaque dock, même en pleine recharge intermédiaire. La détection batterie était donc déclenchée à chaque retour base, provoquant des notifications de fin de tonte répétées. La détection par batterie est supprimée — inutilisable avec cette intégration.
+- **Mode full autonome revient à OFF au redémarrage** : `tonte_mode_auto` déplacé dans `tonte_setup.yaml` comme les autres paramètres persistants. Il ne sera plus réinitialisé à `false` au redémarrage de HA.
+- **Démarrage auto ne se déclenchait pas si heure notif < heure début plage** : ajout d'un second trigger sur `input_datetime.tonte_auto_heure_debut` — l'automation retente au début de la plage autorisée si l'heure de notification est antérieure.
+
+### ✨ Améliorations
+- **Timer fin de tonte à 75 min** (au lieu de 90) : basé sur l'analyse terrain, les recharges intermédiaires durent ~60 min. 75 min est sous ce seuil, ce qui garantit que le timer n'expire qu'en fin de vraie session.
+- **Toggle mode autonome dans la carte d'installation** : `tonte_mode_auto` est maintenant configurable et persisté depuis la carte d'installation comme tous les autres paramètres.
 
 ---
 
