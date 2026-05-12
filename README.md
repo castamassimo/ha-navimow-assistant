@@ -1,4 +1,4 @@
-[README.md](https://github.com/user-attachments/files/27631174/README.md)
+[README.md](https://github.com/user-attachments/files/27635612/README.md)
 # 🌿 Assistant Intelligent de Tonte v2.4.4
 ### Navimow + Home Assistant
 
@@ -71,14 +71,13 @@ Résultat : `lawn_mower.navimow_XXXX` + `sensor.navimow_XXXX_batterie`
 
 ### Étape 2 — Copier les fichiers
 
-Copiez dans `/config/packages/` :
+Copiez **uniquement ces 2 fichiers** dans `/config/packages/` :
 ```
 tonte_intelligente.yaml
 tonte_setup.yaml
-carte_tonte_dashboard.yaml
-carte_tonte_mini.yaml
-carte_tonte_installation.yaml
 ```
+
+> ⚠️ Les cartes (`carte_tonte_dashboard.yaml`, `carte_tonte_mini.yaml`, `carte_tonte_installation.yaml`) ne vont **pas** dans `/config/packages/` — elles sont collées directement dans l'éditeur Lovelace à l'étape 4.
 
 Activez les packages dans `configuration.yaml` si ce n'est pas déjà fait :
 ```yaml
@@ -135,7 +134,7 @@ Si vous préférez ne pas utiliser la carte d'installation, faites ces Chercher/
 
 ## 🔄 Mise à jour
 
-1. Remplacez les fichiers mis à jour dans `/config/packages/` (généralement `tonte_intelligente.yaml`, parfois les cartes)
+1. Remplacez les fichiers mis à jour : `tonte_intelligente.yaml` et/ou `tonte_setup.yaml` dans `/config/packages/`, les cartes directement dans Lovelace
 2. Ouvrez la carte d'installation → vos paramètres sont déjà remplis → cliquez **"Appliquer"**
 3. HA redémarre automatiquement avec la nouvelle version configurée
 
