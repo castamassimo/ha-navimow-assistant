@@ -118,18 +118,8 @@ input_boolean:
     # ═══ MODIFIER ICI : true pour activer, false pour désactiver ═══
     initial: true
 
-  # ┌──────────────────────────────────────────────────────────┐
-  # │         🤖 MODE FULL AUTONOME                            │
-  # │  Quand activé : la tondeuse démarre automatiquement      │
-  # │  si toutes les conditions sont réunies (jour de tonte,   │
-  # │  météo favorable, dans la plage horaire, pas le jour     │
-  # │  d'exclusion, pas en vacances). Une notification         │
-  # │  silencieuse est envoyée pour information.               │
-  # └──────────────────────────────────────────────────────────┘
-  tonte_mode_auto:
-    name: "Mode full autonome"
-    icon: mdi:robot-mower
-    initial: false
+  # tonte_mode_auto est déclaré dans tonte_setup.yaml
+  # (persistance garantie entre les redémarrages HA)
 
   # Watchdog démarrage auto : true pendant l'attente de confirmation
   # que la tondeuse est bien passée en mowing après ordre de démarrage
@@ -192,8 +182,10 @@ input_number:
     min: 15
     max: 240
     step: 15
-    # ═══ MODIFIER ICI : durée en minutes (défaut 90) ═══
-    initial: 90
+    # ═══ MODIFIER ICI : durée en minutes (défaut 75)
+    # 75 min = légèrement sous le cycle de recharge ~1h
+    # pour éviter les fausses fins pendant les recharges intermédiaires ═══
+    initial: 75
     unit_of_measurement: "min"
     icon: mdi:timer-sand
 
@@ -870,41 +862,10 @@ automation:
         target:
           entity_id: timer.tonte_fin_detection
 
-  - id: tonte_batterie_pleine
-    alias: "🌿 Batterie ≥95% stable → fin de tonte (Option B)"
-    description: >
-      Détection intelligente de fin de tonte :
-      Si session active + tondeuse dockée + batterie ≥ 95% stable
-      depuis 5 min + pas de reprise entre-temps → fin de tonte.
-      Plus fiable que le timer statique (confirmé terrain).
-    trigger:
-      - platform: numeric_state
-        entity_id: sensor.navimow_VOTRE_MODELE_batterie
-        above: 94
-        for:
-          minutes: 5
-    condition:
-      - condition: state
-        entity_id: input_boolean.tonte_session_active
-        state: "on"
-      - condition: state
-        entity_id: lawn_mower.navimow_VOTRE_MODELE
-        state: "docked"
-      # La tondeuse n'est pas repartie pendant les 5 min
-      - condition: state
-        entity_id: lawn_mower.navimow_VOTRE_MODELE
-        state: "docked"
-        for:
-          minutes: 5
-    action:
-      # Annuler le timer de sécurité — la batterie a confirmé la fin
-      - service: timer.cancel
-        target:
-          entity_id: timer.tonte_fin_detection
-      # Déclencher manuellement l'événement de fin
-      - event: tonte_fin_confirmee_batterie
-        event_data:
-          source: "batterie_stable"
+  # tonte_batterie_pleine supprimée en v2.4.4 :
+  # L'intégration NavimowHA remonte systématiquement 100% dans les 30s
+  # après chaque dock (valeur fictive), rendant toute détection par
+  # batterie impossible. Remplacé par timer 75 min.
 
   - id: tonte_fin_detectee
     alias: "🌿 Fin détectée"
@@ -913,9 +874,6 @@ automation:
         event_type: timer.finished
         event_data:
           entity_id: timer.tonte_fin_detection
-      # Détection intelligente via batterie ≥95% stable 5 min
-      - platform: event
-        event_type: tonte_fin_confirmee_batterie
     action:
       - choose:
           # Session ignorée — juste reset, pas de comptabilisation
@@ -1808,12 +1766,17 @@ automation:
     alias: "🤖 Démarrage automatique"
     description: >
       En mode full autonome, démarre la tondeuse automatiquement
-      si toutes les conditions sont réunies à l'heure de notification.
+      si toutes les conditions sont réunies à l'heure de notification
+      ou à l'heure de début de plage.
       Vérifie : jour de tonte, météo favorable, plage horaire,
-      jour non exclu, pas en vacances, batterie suffisante.
+      jour non exclu, pas en vacances.
     trigger:
       - platform: time
         at: input_datetime.tonte_heure_notification
+      # Second trigger : si heure notif < heure début plage,
+      # on retente au début de la plage autorisée
+      - platform: time
+        at: input_datetime.tonte_auto_heure_debut
     condition:
       # Mode auto activé
       - condition: state
