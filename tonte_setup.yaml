@@ -1,5 +1,5 @@
 # ╔══════════════════════════════════════════════════════════════╗
-# ║      🌿 ASSISTANT INTELLIGENT DE TONTE v2.3 🌿             ║
+# ║      🌿 ASSISTANT INTELLIGENT DE TONTE v2.5 🌿             ║
 # ║            Package d'installation — tonte_setup.yaml        ║
 # ╚══════════════════════════════════════════════════════════════╝
 #
@@ -55,6 +55,17 @@ input_text:
     icon: mdi:tag
     initial: "Terrasse"
     max: 30
+
+  # ── Prise connectée (optionnel) ──────────────────────────
+  # Laisser vide pour utiliser le timer (mode par défaut).
+  # Si renseigné : la détection de fin de tonte se base sur
+  # la consommation de la station de charge.
+  # ex: sensor.sunology1_puissance
+  tonte_cfg_prise_station:
+    name: "⚙️ Entité prise station (optionnel)"
+    icon: mdi:power-socket-eu
+    initial: ""
+    max: 80
 
   # ── Statut de la dernière application ─────────────────────
   tonte_cfg_statut:
@@ -173,6 +184,10 @@ shell_command:
 
   tonte_persist_statut: >
     sed -i '/tonte_cfg_statut/{n;n;n;s|initial: ".*"|initial: "{{ states('input_text.tonte_cfg_statut') | trim }}"|}'
+    /config/packages/tonte_setup.yaml
+
+  tonte_persist_prise: >
+    sed -i '/tonte_cfg_prise_station/{n;n;n;s|initial: ".*"|initial: "{{ states('input_text.tonte_cfg_prise_station') | trim }}"|}'
     /config/packages/tonte_setup.yaml
 
   tonte_persist_zone_on: >
@@ -310,6 +325,7 @@ script:
       - service: shell_command.tonte_persist_telegram
       - service: shell_command.tonte_persist_mobile
       - service: shell_command.tonte_persist_statut
+      - service: shell_command.tonte_persist_prise
       - choose:
           - conditions:
               - condition: state
