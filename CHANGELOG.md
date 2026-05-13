@@ -1,6 +1,20 @@
-[CHANGELOG.md](https://github.com/user-attachments/files/27631138/CHANGELOG.md)
+[CHANGELOG.md](https://github.com/user-attachments/files/27697879/CHANGELOG.md)
 # 🌿 CHANGELOG — Assistant Intelligent de Tonte
 ## Navimow + Home Assistant
+
+---
+
+## v2.5 — Détection fin de tonte par prise connectée
+*Mai 2026*
+
+### ✨ Nouveautés
+- **Mode prise connectée (optionnel)** : si vous avez une prise connectée avec mesure de consommation sur la station de charge, la détection de fin de tonte se base sur le pattern de consommation — bien plus fiable que le timer. Pattern terrain analysé : veille ~8W (dockée, batterie pleine), absent ~3-4W (en tonte), charge active ~74W (recharge intermédiaire ou finale). Fin de session détectée quand la consommation repasse en zone veille (6-10W) après une charge active, stable pendant 10 min.
+- **Rétrocompatible** : si le champ "Prise station" est laissé vide dans la carte d'installation, le timer 60 min reste actif — aucun changement pour les utilisateurs sans prise connectée.
+- **Seuils configurables** : seuil charge active (défaut 50W), plage veille min/max (défaut 6-10W), délai de confirmation (défaut 10 min) — adaptables selon votre modèle de prise et de tondeuse.
+- **Champ prise dans la carte d'installation** : nouveau champ optionnel pour saisir l'entité de la prise connectée, persisté comme tous les autres paramètres.
+
+### ✨ Améliorations
+- **Timer fin de tonte à 60 min** (au lieu de 75) : calé sur les cycles de recharge terrain mesurés (~44-46 min). Utilisé uniquement si aucune prise n'est configurée.
 
 ---
 
