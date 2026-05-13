@@ -159,6 +159,46 @@ input_number:
     initial: 50
     unit_of_measurement: "%"
     icon: mdi:weather-rainy
+
+  # ┌──────────────────────────────────────────────────────────┐
+  # │  PRISE CONNECTÉE — seuils de détection (optionnel)       │
+  # │  Actif uniquement si tonte_cfg_prise_station est renseigné│
+  # └──────────────────────────────────────────────────────────┘
+  tonte_prise_seuil_charge:
+    name: "Prise - Seuil charge active (W)"
+    min: 20
+    max: 200
+    step: 5
+    initial: 50
+    unit_of_measurement: "W"
+    icon: mdi:lightning-bolt
+
+  tonte_prise_seuil_veille_min:
+    name: "Prise - Seuil veille min (W)"
+    min: 1
+    max: 20
+    step: 0.5
+    initial: 6
+    unit_of_measurement: "W"
+    icon: mdi:power-sleep
+
+  tonte_prise_seuil_veille_max:
+    name: "Prise - Seuil veille max (W)"
+    min: 5
+    max: 30
+    step: 0.5
+    initial: 10
+    unit_of_measurement: "W"
+    icon: mdi:power-sleep
+
+  tonte_prise_delai_confirmation:
+    name: "Prise - Délai confirmation veille (min)"
+    min: 5
+    max: 30
+    step: 1
+    initial: 10
+    unit_of_measurement: "min"
+    icon: mdi:timer-check
   tonte_seuil_batterie:
     name: "Seuil alerte batterie"
     min: 5
@@ -182,10 +222,10 @@ input_number:
     min: 15
     max: 240
     step: 15
-    # ═══ MODIFIER ICI : durée en minutes (défaut 75)
-    # 75 min = légèrement sous le cycle de recharge ~1h
-    # pour éviter les fausses fins pendant les recharges intermédiaires ═══
-    initial: 75
+    # ═══ MODIFIER ICI : durée en minutes (défaut 60)
+    # 60 min = calé sur les cycles de recharge terrain (~44-46 min)
+    # Ignoré si mode prise connectée activé ═══
+    initial: 60
     unit_of_measurement: "min"
     icon: mdi:timer-sand
 
@@ -827,8 +867,9 @@ automation:
   - id: tonte_retour_base_timer
     alias: "🌿 Retour base, timer"
     description: >
-      Démarre le timer de sécurité au retour base.
-      Sert de fallback si la détection batterie ne fonctionne pas.
+      Démarre le timer de détection de fin de tonte au retour base.
+      Actif uniquement si aucune prise connectée n'est configurée.
+      Si prise configurée : c'est tonte_fin_detectee_prise qui gère.
     trigger:
       - platform: state
         entity_id: lawn_mower.navimow_VOTRE_MODELE
@@ -837,12 +878,15 @@ automation:
       - condition: state
         entity_id: input_boolean.tonte_session_active
         state: "on"
+      # Pas de timer si prise connectée configurée
+      - condition: template
+        value_template: "{{ states('input_text.tonte_cfg_prise_station') | trim == '' }}"
     action:
       - service: timer.start
         target:
           entity_id: timer.tonte_fin_detection
         data:
-          duration: "{{ (states('input_number.tonte_delai_fin_detection') | int(90) * 60) }}"
+          duration: "{{ (states('input_number.tonte_delai_fin_detection') | int(60) * 60) }}"
 
   - id: tonte_reprise_apres_recharge
     alias: "🌿 Reprise après recharge"
@@ -1938,3 +1982,153 @@ automation:
                     tag: "tonte_auto_echec"
                     importance: high
                     channel: "Tonte"
+
+  # ═══ DÉTECTION FIN DE TONTE PAR PRISE CONNECTÉE ═══
+  # Actif uniquement si input_text.tonte_cfg_prise_station est renseigné.
+  # Détecte le passage en veille (6-10W) après une charge active (>50W)
+  # confirmé pendant tonte_prise_delai_confirmation minutes.
+
+  - id: tonte_fin_detectee_prise
+    alias: "🔌 Fin détectée par prise connectée"
+    description: >
+      Détection de fin de tonte via la consommation de la station.
+      Pattern terrain : veille ~8W, tonte absente ~3W, charge active ~74W.
+      Fin confirmée quand puissance repasse en zone veille (6-10W)
+      après une charge active, stable pendant X minutes.
+    trigger:
+      - platform: template
+        value_template: >
+          {% set prise = states('input_text.tonte_cfg_prise_station') | trim %}
+          {% if prise == '' %}false
+          {% else %}
+            {% set w = states(prise) | float(-1) %}
+            {% set vmin = states('input_number.tonte_prise_seuil_veille_min') | float(6) %}
+            {% set vmax = states('input_number.tonte_prise_seuil_veille_max') | float(10) %}
+            {{ w >= vmin and w <= vmax }}
+          {% endif %}
+        for:
+          minutes: "{{ states('input_number.tonte_prise_delai_confirmation') | int(10) }}"
+    condition:
+      # Prise configurée
+      - condition: template
+        value_template: "{{ states('input_text.tonte_cfg_prise_station') | trim != '' }}"
+      # Session active
+      - condition: state
+        entity_id: input_boolean.tonte_session_active
+        state: "on"
+      # Tondeuse dockée
+      - condition: state
+        entity_id: lawn_mower.navimow_VOTRE_MODELE
+        state: "docked"
+    action:
+      # Annuler le timer de sécurité si actif
+      - service: timer.cancel
+        target:
+          entity_id: timer.tonte_fin_detection
+      # Déclencher la fin de session via événement
+      - event: tonte_fin_confirmee_prise
+        event_data:
+          source: "prise_connectee"
+
+  - id: tonte_fin_prise_handler
+    alias: "🔌 Handler fin de tonte prise"
+    description: >
+      Reçoit l'événement de fin confirmée par prise et
+      déclenche le même traitement que la fin par timer.
+    trigger:
+      - platform: event
+        event_type: tonte_fin_confirmee_prise
+    action:
+      - choose:
+          # Session ignorée
+          - conditions:
+              - condition: state
+                entity_id: input_boolean.tonte_session_ignoree
+                state: "on"
+            sequence:
+              - service: input_boolean.turn_off
+                target:
+                  entity_id:
+                    - input_boolean.tonte_session_active
+                    - input_boolean.tonte_mode_zone_isolee
+                    - input_boolean.tonte_zone_confirmee
+                    - input_boolean.tonte_session_ignoree
+              - condition: state
+                entity_id: input_boolean.tonte_mode_vacances
+                state: "off"
+              - choose:
+                  - conditions:
+                      - condition: state
+                        entity_id: input_select.tonte_mode_notification
+                        state: "telegram"
+                    sequence:
+                      - service: telegram_bot.send_message
+                        data:
+                          parse_mode: html
+                          message: "ℹ️ Tonte terminée (non comptabilisée)."
+          # Zone isolée
+          - conditions:
+              - condition: state
+                entity_id: input_boolean.tonte_mode_zone_isolee
+                state: "on"
+            sequence:
+              - service: script.tonte_marquer_zone_isolee
+              - condition: state
+                entity_id: input_boolean.tonte_mode_vacances
+                state: "off"
+              - choose:
+                  - conditions:
+                      - condition: state
+                        entity_id: input_select.tonte_mode_notification
+                        state: "telegram"
+                    sequence:
+                      - service: telegram_bot.send_message
+                        data:
+                          parse_mode: html
+                          message: "✅ <b>Tonte {{ states('input_text.tonte_zone_isolee_nom') }} terminée !</b> 🔋 {{ states('sensor.navimow_VOTRE_MODELE_batterie') | int(0) }}% · {{ states('input_text.tonte_zone_isolee_nom') }} n°{{ states('counter.tonte_compteur_zone_isolee') }}"
+                  - conditions:
+                      - condition: state
+                        entity_id: input_select.tonte_mode_notification
+                        state: "mobile"
+                    sequence:
+                      - service: notify.mobile_app_pixel_9a
+                        data:
+                          title: "✅ {{ states('input_text.tonte_zone_isolee_nom') }} terminée !"
+                          message: "Batterie : {{ states('sensor.navimow_VOTRE_MODELE_batterie') | int(0) }}%"
+                          data:
+                            tag: "tonte_du_jour"
+                            channel: "Tonte"
+        default:
+          # Jardin
+          - service: script.tonte_marquer_effectuee
+          - condition: state
+            entity_id: input_boolean.tonte_mode_vacances
+            state: "off"
+          - choose:
+              - conditions:
+                  - condition: state
+                    entity_id: input_select.tonte_mode_notification
+                    state: "telegram"
+                sequence:
+                  - service: telegram_bot.send_message
+                    data:
+                      parse_mode: html
+                      message: >-
+                        ✅ <b>Tonte jardin terminée !</b>
+
+                        🔌 Détectée via prise connectée
+                        🔋 {{ states('sensor.navimow_VOTRE_MODELE_batterie') | int(0) }}%
+                        🔢 Tonte n°{{ states('counter.tonte_compteur_saison') }}
+                        ➡️ Prochaine dans ~{{ state_attr('sensor.tonte_profil_saisonnier', 'intervalle_jours') | int(5) }} jours
+              - conditions:
+                  - condition: state
+                    entity_id: input_select.tonte_mode_notification
+                    state: "mobile"
+                sequence:
+                  - service: notify.mobile_app_pixel_9a
+                    data:
+                      title: "✅ Tonte terminée !"
+                      message: "Batterie : {{ states('sensor.navimow_VOTRE_MODELE_batterie') | int(0) }}% · Tonte n°{{ states('counter.tonte_compteur_saison') }}"
+                      data:
+                        tag: "tonte_du_jour"
+                        channel: "Tonte"
