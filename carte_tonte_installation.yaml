@@ -89,6 +89,14 @@ cards:
           icon: mdi:weather-partly-cloudy
           icon_color: cyan
 
+        # ── Prise connectée (optionnel) ───────────────────────
+        - type: custom:mushroom-entity-card
+          entity: input_text.tonte_cfg_prise_station
+          name: "Prise station (optionnel)"
+          secondary_info: "Laisser vide = timer 60 min · ex : sensor.sunology1_puissance"
+          icon: mdi:power-socket-eu
+          icon_color: deep-orange
+
         # ── Entité Telegram ───────────────────────────────────
         - type: custom:mushroom-entity-card
           entity: input_text.tonte_cfg_telegram_event
