@@ -1,5 +1,5 @@
-[README.md](https://github.com/user-attachments/files/27635612/README.md)
-# 🌿 Assistant Intelligent de Tonte v2.4.4
+[README.md](https://github.com/user-attachments/files/27697893/README.md)
+# 🌿 Assistant Intelligent de Tonte v2.5
 ### Navimow + Home Assistant
 
 Un assistant complet pour automatiser, planifier et superviser votre tondeuse Navimow depuis Home Assistant. Notifications intelligentes, adaptation saisonnière, gestion météo, historique et installation en quelques clics.
@@ -14,7 +14,8 @@ Un assistant complet pour automatiser, planifier et superviser votre tondeuse Na
 | 🌦️ Météo intelligente | Report automatique si risque de pluie (Météo France), prévision du lendemain |
 | ⏭️ Report différé | 1h / 2h / 4h / demain avec rappel à l'expiration |
 | 💬 Multi-notifications | Telegram (boutons inline), Mobile (Companion App) ou aucune |
-| 🔄 Fin de tonte intelligente | Timer 75 min (calé sur les cycles de recharge ~60 min observés terrain) |
+| 🔄 Fin de tonte intelligente | Prise connectée (pattern conso) ou timer 60 min en fallback |
+| 🔌 Prise connectée (optionnel) | Détection via consommation station : veille ~8W, tonte ~3W, charge ~74W |
 | 🏠 Multi-zones | Jardin + zone isolée (terrasse, potager...) avec compteurs séparés |
 | 📅 Historique | Calendrier local HA avec chaque session (activable/désactivable) |
 | 🚨 Alertes | Erreur tondeuse, batterie faible, pelouse en retard |
@@ -172,7 +173,9 @@ Configurables en YAML dans `tonte_intelligente.yaml` (section balisée) :
 | `tonte_delai_demande_zone` | 120 sec | Délai avant la question de zone via Telegram |
 | `tonte_retard_multiplicateur` | ×2 | Multiplicateur intervalle avant alerte pelouse en retard |
 
-> ℹ️ La fin de tonte est détectée par le timer `tonte_delai_fin_detection` (défaut 75 min, calé sous les cycles de recharge ~60 min). La détection batterie a été abandonnée — l'intégration NavimowHA remonte une valeur fictive de 100% dans les 30s après chaque dock.
+> ℹ️ Deux modes de détection de fin de tonte :
+> - **Mode prise connectée** (recommandé si disponible) : renseignez l'entité de votre prise dans la carte d'installation. Seuils configurables selon votre matériel.
+> - **Mode timer** (défaut) : 60 min, calé sur les cycles de recharge terrain (~44-46 min). Actif si aucune prise n'est configurée.
 
 ---
 
